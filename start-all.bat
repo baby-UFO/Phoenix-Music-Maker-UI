@@ -47,7 +47,9 @@ REM Detect Phoenix Engine installation type
 set API_COMMAND=
 if exist "%ACESTEP_PATH%\python_embeded\python.exe" (
     echo [+] Detected Windows Portable Package
-    set API_COMMAND=python_embeded\python acestep\acestep_v15_pipeline.py --port 8001 --server-name 127.0.0.1 --enable-api --backend pt --init_service true
+    REM Prefer non-turbo DiT so inference steps >8 are not clamped to 8 by turbo
+    if "%ACESTEP_CONFIG_PATH%"=="" set ACESTEP_CONFIG_PATH=acestep-v15-base
+    set API_COMMAND=python_embeded\python acestep\acestep_v15_pipeline.py --port 8001 --server-name 127.0.0.1 --enable-api --backend pt --init_service true --config_path %ACESTEP_CONFIG_PATH%
 ) else (
     echo [+] Detected Standard Installation
     set API_COMMAND=uv run acestep-api --port 8001
@@ -68,7 +70,7 @@ echo.
 
 REM Start Phoenix Engine API in new window
 echo [1/3] Starting Phoenix Engine API server...
-start "Phoenix Engine API" cmd /k "cd /d "%ACESTEP_PATH%" && %API_COMMAND%"
+start "Phoenix Engine API" cmd /k "cd /d "%ACESTEP_PATH%" && set ACESTEP_CONFIG_PATH=%ACESTEP_CONFIG_PATH% && %API_COMMAND%"
 
 REM Wait for API to start
 echo Waiting for API to initialize...

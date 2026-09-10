@@ -515,7 +515,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return lsGet(storageKeys.model.primary, storageKeys.model.legacy) || 'acestep-v15-turbo-shift3';
+    return lsGet(storageKeys.model.primary, storageKeys.model.legacy) || 'acestep-v15-base';
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -556,6 +556,29 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const isTurboModel = (modelId: string): boolean => {
     return modelId.includes('turbo');
   };
+
+  const TURBO_INFER_STEPS_MAX = 8;
+
+  const preferNonTurboModel = useCallback((models: { id: string; name: string }[]): string => {
+    const ids = models.map((m) => m.id);
+    if (ids.includes('acestep-v15-base')) return 'acestep-v15-base';
+    if (ids.includes('acestep-v15-sft')) return 'acestep-v15-sft';
+    const nonTurbo = ids.find((id) => !id.includes('turbo'));
+    return nonTurbo || 'acestep-v15-base';
+  }, []);
+
+  const switchToNonTurboForHighSteps = useCallback((steps: number, currentModel: string) => {
+    if (steps <= TURBO_INFER_STEPS_MAX) return currentModel;
+    if (!isTurboModel(currentModel)) return currentModel;
+    const next = preferNonTurboModel(availableModels);
+    if (next !== currentModel) {
+      setSelectedModel(next);
+      lsSet(storageKeys.model.primary, next, storageKeys.model.legacy);
+      setUseAdg(true);
+      console.log(`[CreatePanel] inferenceSteps=${steps} on turbo '${currentModel}' → auto-switch to '${next}'`);
+    }
+    return next;
+  }, [availableModels, preferNonTurboModel]);
 
   const [isUploadingReference, setIsUploadingReference] = useState(false);
   const [isUploadingSource, setIsUploadingSource] = useState(false);
@@ -685,6 +708,11 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     }
     previousModelRef.current = selectedModel;
   }, [selectedModel, loraLoaded]);
+
+  // Prefer real multi-step diffusion: turbo + steps>8 → auto-switch to base/sft
+  useEffect(() => {
+    switchToNonTurboForHighSteps(inferenceSteps, selectedModel);
+  }, [inferenceSteps, selectedModel, switchToNonTurboForHighSteps]);
 
   // Auto-disable thinking and ADG when LoRA is loaded
   useEffect(() => {
@@ -922,12 +950,18 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         const models = data.models || [];
         if (models.length > 0) {
           setFetchedModels(models);
-          // Always sync to the backend's active model
+          // Prefer non-turbo when high steps requested. Don't blindly force engine "active" turbo.
+          const saved = lsGet(storageKeys.model.primary, storageKeys.model.legacy);
+          const preferBase = models.find((m: any) => m.name === 'acestep-v15-base')
+            || models.find((m: any) => m.name === 'acestep-v15-sft')
+            || models.find((m: any) => !String(m.name).includes('turbo'));
           const active = models.find((m: any) => m.is_active);
-          if (active) {
-            setSelectedModel(active.name);
-            lsSet(storageKeys.model.primary, active.name, storageKeys.model.legacy);
+          let next = saved || (preferBase ? preferBase.name : undefined) || active?.name || 'acestep-v15-base';
+          if ((typeof inferenceSteps === 'number' ? inferenceSteps : 200) > 8 && String(next).includes('turbo') && preferBase) {
+            next = preferBase.name;
           }
+          setSelectedModel(next);
+          lsSet(storageKeys.model.primary, next, storageKeys.model.legacy);
         }
       }
     } catch {
@@ -1686,8 +1720,11 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                           lsSet(storageKeys.model.primary, model.id, storageKeys.model.legacy);
                           // Auto-adjust parameters for non-turbo models
                           if (!isTurboModel(model.id)) {
-                            setInferenceSteps(20);
+                            if (inferenceSteps <= TURBO_INFER_STEPS_MAX) setInferenceSteps(20);
                             setUseAdg(true);
+                          } else if (inferenceSteps > TURBO_INFER_STEPS_MAX) {
+                            // Turbo engine clamps >8 → 8; keep UI honest
+                            setInferenceSteps(TURBO_INFER_STEPS_MAX);
                           }
                           setShowModelMenu(false);
                         }}
@@ -2515,12 +2552,27 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               label={t('inferenceSteps')}
               value={inferenceSteps}
               min={1}
-              max={isTurboModel(selectedModel) ? 20 : 200}
+              max={isTurboModel(selectedModel) ? TURBO_INFER_STEPS_MAX : 200}
               step={1}
-              onChange={setInferenceSteps}
+              onChange={(val) => {
+                setInferenceSteps(val);
+                // Raising above turbo cap switches to base so multi-step diffusion actually runs
+                if (val > TURBO_INFER_STEPS_MAX) {
+                  switchToNonTurboForHighSteps(val, selectedModel);
+                }
+              }}
               helpText={t('moreStepsBetterQuality')}
               title="More steps usually improves quality but slows generation."
             />
+            {isTurboModel(selectedModel) ? (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 -mt-1">
+                {`Turbo max ${TURBO_INFER_STEPS_MAX} (engine clamps higher). Steps > ${TURBO_INFER_STEPS_MAX} auto-switch to base for real multi-step diffusion.`}
+              </p>
+            ) : (
+              <p className="text-[10px] text-zinc-500 -mt-1">
+                Non-turbo DiT: up to 200 inference steps (not limited by the turbo clamp).
+              </p>
+            )}
 
             {/* Guidance Scale */}
             <EditableSlider
