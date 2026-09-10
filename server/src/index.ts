@@ -100,20 +100,18 @@ app.use('/audio', express.static(path.join(__dirname, '../public/audio')));
 app.get('/api/audio/export', async (req, res) => {
   let tmpPath: string | null = null;
   try {
-    const { convertWithFfmpeg, contentTypeFor, isExportFormat, resolveLocalAudioPath, safeDownloadName } = await import('./services/ffmpegExport.js');
+    const { convertWithFfmpeg, contentTypeFor, isExportFormat, materializeAudioForExport, safeDownloadName } = await import('./services/ffmpegExport.js');
     const formatRaw = String(req.query.format || 'wav').toLowerCase();
     if (!isExportFormat(formatRaw)) {
-      res.status(400).json({ error: 'Invalid format. Use wav, mp3, flac, or ogg.' });
+      res.status(400).json({ error: 'Invalid format. Use wav, mp3, flac, ogg, or aac.' });
       return;
     }
     const src = String(req.query.src || req.query.url || '');
-    const localPath = resolveLocalAudioPath(src);
-    if (!localPath) {
-      res.status(404).json({ error: 'Local audio not found' });
-      return;
-    }
-    const outPath = await convertWithFfmpeg(localPath, formatRaw);
-    if (outPath !== localPath) tmpPath = outPath;
+    const materialized = await materializeAudioForExport(src);
+    const srcCleanup = materialized.cleanup ? materialized.path : null;
+    const outPath = await convertWithFfmpeg(materialized.path, formatRaw);
+    if (outPath !== materialized.path) tmpPath = outPath;
+    (res as any).__phoenixSrcCleanup = srcCleanup;
     const title = String(req.query.title || 'song');
     const filename = safeDownloadName(title, formatRaw);
     res.setHeader('Content-Type', contentTypeFor(formatRaw));
@@ -123,6 +121,8 @@ app.get('/api/audio/export', async (req, res) => {
         import('node:fs').then(fs => fs.unlink(tmpPath!, () => {}));
         tmpPath = null;
       }
+      const srcCleanup = (res as any).__phoenixSrcCleanup as string | null;
+      if (srcCleanup) import('node:fs').then(fs => fs.unlink(srcCleanup, () => {}));
       if (err && !res.headersSent) res.status(500).json({ error: 'Failed to send file' });
     });
   } catch (error: any) {

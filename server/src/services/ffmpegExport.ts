@@ -26,21 +26,58 @@ export function contentTypeFor(format: ExportFormat): string {
   return CONTENT_TYPES[format];
 }
 
-/** Resolve /audio/foo.flac or bare filename to an absolute local path. */
+/** Resolve /audio/... paths (including nested user folders) to an absolute local path. */
 export function resolveLocalAudioPath(audioUrlOrName: string): string | null {
   if (!audioUrlOrName) return null;
   let name = audioUrlOrName.trim();
   if (name.startsWith('http://') || name.startsWith('https://') || name.startsWith('s3://')) {
     return null;
   }
+  try {
+    // Absolute file path already on disk
+    if (path.isAbsolute(name) && fs.existsSync(name)) {
+      return name;
+    }
+  } catch { /* ignore */ }
   if (name.startsWith('/audio/')) name = name.slice('/audio/'.length);
   name = name.replace(/^\/+/, '');
-  // Prevent path traversal
-  name = path.basename(name);
-  const full = path.join(LOCAL_AUDIO_DIR, name);
-  if (!full.startsWith(LOCAL_AUDIO_DIR)) return null;
+  // Normalize and block path traversal while keeping nested folders (userId/song.flac)
+  const full = path.resolve(LOCAL_AUDIO_DIR, name);
+  const root = path.resolve(LOCAL_AUDIO_DIR);
+  if (full !== root && !full.startsWith(root + path.sep)) return null;
   if (!fs.existsSync(full)) return null;
   return full;
+}
+
+/** Ensure we have a local file for ffmpeg: local path, or download remote URL to a temp file. */
+export async function materializeAudioForExport(audioUrlOrName: string): Promise<{ path: string; cleanup: boolean }> {
+  const local = resolveLocalAudioPath(audioUrlOrName);
+  if (local) return { path: local, cleanup: false };
+
+  const src = (audioUrlOrName || '').trim();
+  if (!src) throw new Error('No audio URL');
+
+  let fetchUrl = src;
+  if (src.startsWith('/')) {
+    // Same-origin relative /audio/... that resolveLocal missed — should not happen after path fix
+    fetchUrl = `http://127.0.0.1:3001${src}`;
+  } else if (!(src.startsWith('http://') || src.startsWith('https://'))) {
+    throw new Error('Local audio file not found for export (ffmpeg needs a local file).');
+  }
+
+  const res = await fetch(fetchUrl);
+  if (!res.ok) throw new Error(`Failed to fetch audio for export (${res.status})`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (!buf.length) throw new Error('Downloaded audio is empty');
+
+  const urlPath = fetchUrl.split('?')[0].toLowerCase();
+  let ext = 'audio';
+  for (const e of ['flac', 'wav', 'mp3', 'ogg', 'aac', 'm4a', 'opus']) {
+    if (urlPath.endsWith('.' + e)) { ext = e; break; }
+  }
+  const tmp = path.join(os.tmpdir(), `phoenix-export-src-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
+  fs.writeFileSync(tmp, buf);
+  return { path: tmp, cleanup: true };
 }
 
 function ffmpegArgs(input: string, output: string, format: ExportFormat): string[] {
@@ -65,7 +102,7 @@ export async function convertWithFfmpeg(inputPath: string, format: ExportFormat)
     return inputPath; // already desired format
   }
 
-  const tmp = path.join(os.tmpdir(), `ace-export-${Date.now()}-${Math.random().toString(36).slice(2)}.${format}`);
+  const tmp = path.join(os.tmpdir(), `phoenix-export-${Date.now()}-${Math.random().toString(36).slice(2)}.${format}`);
   const args = ffmpegArgs(inputPath, tmp, format);
 
   await new Promise<void>((resolve, reject) => {

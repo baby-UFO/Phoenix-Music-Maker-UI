@@ -10,7 +10,7 @@ import {
   convertWithFfmpeg,
   contentTypeFor,
   isExportFormat,
-  resolveLocalAudioPath,
+  materializeAudioForExport,
   safeDownloadName,
   type ExportFormat,
 } from '../services/ffmpegExport.js';
@@ -118,7 +118,7 @@ router.get('/:id/download', optionalAuthMiddleware, async (req: AuthenticatedReq
   try {
     const formatRaw = String(req.query.format || 'wav').toLowerCase();
     if (!isExportFormat(formatRaw)) {
-      res.status(400).json({ error: 'Invalid format. Use wav, mp3, flac, or ogg.' });
+      res.status(400).json({ error: 'Invalid format. Use wav, mp3, flac, ogg, or aac.' });
       return;
     }
     const format = formatRaw as ExportFormat;
@@ -137,27 +137,30 @@ router.get('/:id/download', optionalAuthMiddleware, async (req: AuthenticatedReq
       return;
     }
 
-    const localPath = resolveLocalAudioPath(song.audio_url || '');
-    if (!localPath) {
-      res.status(404).json({ error: 'Local audio file not found for export (ffmpeg needs a local file).' });
-      return;
+    const src = await materializeAudioForExport(song.audio_url || '');
+    const srcCleanup = src.cleanup ? src.path : null;
+    try {
+      const outPath = await convertWithFfmpeg(src.path, format);
+      if (outPath !== src.path) tmpPath = outPath;
+
+      const filename = safeDownloadName(song.title, format);
+      res.setHeader('Content-Type', contentTypeFor(format));
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      await new Promise<void>((resolve, reject) => {
+        res.sendFile(path.resolve(outPath), (err) => {
+          if (tmpPath) {
+            fs.unlink(tmpPath, () => {});
+            tmpPath = null;
+          }
+          if (srcCleanup) fs.unlink(srcCleanup, () => {});
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    } catch (e) {
+      if (srcCleanup) fs.unlink(srcCleanup, () => {});
+      throw e;
     }
-
-    const outPath = await convertWithFfmpeg(localPath, format);
-    if (outPath !== localPath) tmpPath = outPath;
-
-    const filename = safeDownloadName(song.title, format);
-    res.setHeader('Content-Type', contentTypeFor(format));
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.sendFile(path.resolve(outPath), (err) => {
-      if (tmpPath) {
-        fs.unlink(tmpPath, () => {});
-        tmpPath = null;
-      }
-      if (err && !res.headersSent) {
-        res.status(500).json({ error: 'Failed to send file' });
-      }
-    });
   } catch (error) {
     if (tmpPath) fs.unlink(tmpPath, () => {});
     console.error('Download export error:', error);
