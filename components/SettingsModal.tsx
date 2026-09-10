@@ -226,17 +226,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                     <p className="text-zinc-900 dark:text-white font-medium mb-2">{t('createdBy')}</p>
                                     <div className="flex flex-wrap gap-2">
                                         <a
-                                            href="https://x.com/AmbsdOP"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
-                                        >
-                                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                                            </svg>
-                                            {t('follow')} @AmbsdOP
-                                        </a>
-                                        <a
                                             href="https://github.com/baby-UFO/Phoenix-Music-Maker-UI"
                                             target="_blank"
                                             rel="noopener noreferrer"
