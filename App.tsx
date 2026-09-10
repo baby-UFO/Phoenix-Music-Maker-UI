@@ -1373,7 +1373,7 @@ function AppContent() {
             <div
               className={`
               ${mobileShowList ? 'hidden md:block' : 'w-full'}
-              md:w-[var(--create-panel-w)] flex-shrink-0 h-full border-r border-zinc-200 dark:border-white/5 bg-zinc-50 dark:bg-suno-panel relative z-10 transition-colors duration-300
+              md:w-[var(--create-panel-w)] flex-shrink-0 h-full md:border-r-0 border-r border-zinc-200 dark:border-white/5 bg-zinc-50 dark:bg-suno-panel relative z-10 transition-colors duration-300
             `}
               style={{ ['--create-panel-w' as string]: `${createPanelWidth}px` } as React.CSSProperties}
             >
@@ -1387,20 +1387,27 @@ function AppContent() {
               />
             </div>
 
-            {/* Draggable divider between engine controls and workspace (md+) */}
+            {/* Draggable divider — same muted pill grip as lyrics/style resize handles */}
             <div
               role="separator"
               aria-orientation="vertical"
               aria-label="Resize create panel"
               onMouseDown={handleCreatePanelResizeStart}
               className={`
-                hidden md:flex flex-shrink-0 w-1.5 h-full cursor-col-resize z-20
-                items-stretch justify-center
+                hidden md:flex flex-shrink-0 w-3 h-full cursor-col-resize z-20
+                items-center justify-center
                 group relative
-                ${isResizingCreatePanel ? 'bg-pink-500/40' : 'bg-transparent hover:bg-zinc-300/80 dark:hover:bg-white/10'}
+                ${isResizingCreatePanel ? 'bg-zinc-100 dark:bg-white/5' : 'bg-transparent hover:bg-zinc-100 dark:hover:bg-white/5'}
+                transition-colors
               `}
             >
-              <div className={`w-px h-full ${isResizingCreatePanel ? 'bg-pink-500' : 'bg-transparent group-hover:bg-zinc-400 dark:group-hover:bg-white/20'}`} />
+              <div
+                className={`w-1 h-8 rounded-full transition-colors ${
+                  isResizingCreatePanel
+                    ? 'bg-zinc-400 dark:bg-zinc-500'
+                    : 'bg-zinc-300 dark:bg-zinc-700 group-hover:bg-zinc-400 dark:group-hover:bg-zinc-500'
+                }`}
+              />
             </div>
 
             {/* Song List */}
