@@ -23,15 +23,15 @@ if [ ! -d "server/node_modules" ]; then
 fi
 
 # Get Phoenix Engine path from environment or use default
-ACESTEP_PATH="${ACESTEP_PATH:-../ACE-Step-1.5}"
+ACESTEP_PATH="${ACESTEP_PATH:-../Phoenix-Engine}"
 
 # Check if Phoenix Engine exists
 if [ ! -d "$ACESTEP_PATH" ]; then
     echo
     echo "Warning: Phoenix Engine not found at $ACESTEP_PATH"
     echo
-    echo "Please set ACESTEP_PATH or place ACE-Step-1.5 next to Phoenix-Music-Maker-UI"
-    echo "Example: export ACESTEP_PATH=/path/to/ACE-Step-1.5"
+    echo "Please set ACESTEP_PATH or place Phoenix-Engine next to Phoenix-Music-Maker-UI"
+    echo "Example: export PHOENIX_ENGINE_PATH=/path/to/Phoenix-Engine"
     echo
     exit 1
 fi

@@ -65,10 +65,10 @@ Build music privately on your own GPU — no subscription queue, no cloud lock-i
 Your usual layout:
 
 - UI: E:\ace-step (this repo — Phoenix Music Maker UI)
-- Engine: E:\ACE-Step-1.5 (Phoenix Engine install folder)
+- Engine: E:\Phoenix-Engine (Phoenix Engine install folder)
 
 `atch
-cd E:\ace-step
+cd E:\Phoenix-Music-Maker-UI
 start-all.bat
 `
 
@@ -85,11 +85,11 @@ Manual (two terminals):
 
 `atch
 REM Terminal 1 — Phoenix Engine
-cd E:\ACE-Step-1.5
+cd E:\Phoenix-Engine
 python_embeded\python -m acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
 
 REM Terminal 2 — Phoenix Music Maker UI
-cd E:\ace-step
+cd E:\Phoenix-Music-Maker-UI
 start.bat
 `
 
@@ -101,7 +101,7 @@ Open **http://localhost:3000** (LAN: http://YOUR_IP:3000).
 
 `ash
 cd Phoenix-Music-Maker-UI
-export ACESTEP_PATH=/path/to/your-engine   # optional; default ../ACE-Step-1.5
+export ACESTEP_PATH=/path/to/your-engine   # optional; default ../Phoenix-Engine
 ./start-all.sh
 `
 
@@ -113,15 +113,15 @@ Stop with ./stop-all.sh.
 
 ### 1. Phoenix Engine
 
-**Windows portable package (easiest):** download and extract a local Gradio engine build (e.g. under E:\ACE-Step-1.5 / C:\ACE-Step-1.5) that includes an embedded Python runtime.
+**Windows portable package (easiest):** download and extract a local Gradio engine build (e.g. under E:\Phoenix-Engine / C:\Phoenix-Engine) that includes an embedded Python runtime.
 
 **Standard install:**
 
 `ash
 # Clone / install your local Phoenix Engine (Gradio music backend)
 # Example path name kept for compatibility with existing scripts:
-git clone <your-engine-repo-or-mirror> ACE-Step-1.5
-cd ACE-Step-1.5
+git clone <your-engine-repo-or-mirror> Phoenix-Engine
+cd Phoenix-Engine
 uv venv
 uv pip install -e .
 `

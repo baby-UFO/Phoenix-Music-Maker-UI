@@ -3,7 +3,7 @@
     "id": "v1-gradio-migration",
     "date": "2025-02-09",
     "title": "Switched to Gradio API Backend",
-    "body": "We migrated the backend from REST API to Gradio API for direct communication with ACE-Step. This version is experimental — if you encounter any bugs, please report them or open a PR on our GitHub repo.",
+    "body": "We migrated the backend from REST API to Gradio API for direct communication with Phoenix Engine. This version is experimental — if you encounter any bugs, please report them or open a PR on our GitHub repo.",
     "tags": ["backend", "experimental"]
   },
   {

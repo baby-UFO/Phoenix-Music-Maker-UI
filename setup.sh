@@ -8,15 +8,15 @@ echo "  Phoenix Music Maker UI Setup"
 echo "=================================="
 
 # Check if Phoenix Engine exists
-ACESTEP_PATH="${ACESTEP_PATH:-../ACE-Step-1.5}"
+ACESTEP_PATH="${ACESTEP_PATH:-../Phoenix-Engine}"
 
 if [ ! -d "$ACESTEP_PATH" ]; then
     echo "Error: Phoenix Engine not found at $ACESTEP_PATH"
     echo ""
     echo "Please clone Phoenix Engine first:"
     echo "  cd .."
-    echo "  git clone https://github.com/ace-step/ACE-Step-1.5"
-    echo "  cd ACE-Step-1.5"
+    echo "  git clone <your-phoenix-engine-mirror-or-install> Phoenix-Engine"
+    echo "  cd Phoenix-Engine"
     echo "  uv venv && uv pip install -e ."
     echo "  cd ../Phoenix-Music-Maker-UI"
     echo "  ./setup.sh"
@@ -48,7 +48,7 @@ PORT=3001
 FRONTEND_PORT=3000
 
 # Database
-DATABASE_PATH=./server/data/acestep.db
+DATABASE_PATH=./server/data/phoenix.db
 EOF
 
 # Install frontend dependencies
