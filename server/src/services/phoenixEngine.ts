@@ -143,7 +143,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   const promoteVocals = (text: string): string => {
     if (!text) return text;
     const parts = text.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
-    const vocalRe = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered)\b/i;
+    const vocalRe = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered|rapped delivery|rhythmic rapped)\b/i;
     const vocal = parts.filter((p) => vocalRe.test(p));
     const other = parts.filter((p) => !vocalRe.test(p));
     const rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
@@ -160,10 +160,37 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   };
   prompt = promoteVocals(prompt);
 
+  const wantsRap = /\b(rap|rapping|rapper|drill|trap|hip[- ]?hop|grime|boom[- ]?bap)\b/i.test(prompt);
+  if (wantsRap) {
+    // Rewrite toxic oratorical / slow-sung cues that outrank "rap" in the conditioner
+    prompt = prompt
+      .replace(/\bgravelly mature oratorical delivery\b/gi, 'gravelly mature deep male timbre')
+      .replace(/\boratorical delivery\b/gi, 'rapped delivery')
+      .replace(/\boratorical\b/gi, 'rapped')
+      .replace(/\bslow deliberate pacing\b/gi, 'tight syllabic flow on-beat');
+    const rapCues = [
+      'rhythmic rapped delivery',
+      'tight syllabic flow on-beat',
+      'aggressive spit',
+      'no singing',
+      'no humming',
+      'no melisma',
+      'no slow sung ballad vocals',
+    ];
+    for (const cue of rapCues) {
+      const re = new RegExp(cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      if (!re.test(prompt)) prompt = `${cue}, ${prompt}`;
+    }
+  }
+
   // Force James Earl Jones-depth wording when user asked for deep male / baritone / basso
+  // NEVER inject "oratorical delivery" — it pulls slow sung/hummed delivery over rap.
   const wantsJeJDepth = /\b(baritone|basso|profondo|james earl jones|chest voice|low male|deep male|oratorical)\b/i.test(prompt);
   if (wantsJeJDepth && !/james earl jones/i.test(prompt)) {
-    prompt = `James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature oratorical delivery, rumbling low register, no tenor (~170 Hz+), ${prompt}`;
+    const jejLead = wantsRap
+      ? 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature deep male timbre, rhythmic rapped delivery, rumbling low register, no tenor (~170 Hz+)'
+      : 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature deep male timbre, rumbling low register, no tenor (~170 Hz+)';
+    prompt = `${jejLead}, ${prompt}`;
   }
 
 
@@ -209,6 +236,13 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     const antiHalf = `half-time feel, slow ${Math.round(userBpm / 2)} BPM groove, lethargic ballad pacing, dragging tempo`;
     if (!lmNegative || lmNegative === 'NO USER INPUT') lmNegative = antiHalf;
     else if (!/half-time feel|dragging tempo/i.test(lmNegative)) lmNegative = `${lmNegative}, ${antiHalf}`;
+  }
+  if (wantsRap) {
+    const antiSung = 'humming, melismatic singing, slow sung ballad vocals, crooning, operatic vocals, legato sung melody, spoken-sung hybrid';
+    if (!lmNegative || lmNegative === 'NO USER INPUT') lmNegative = antiSung;
+    else if (!/humming|melismatic|slow sung|crooning|operatic|legato sung|spoken-sung/i.test(lmNegative)) {
+      lmNegative = `${lmNegative}, ${antiSung}`;
+    }
   }
 
 
