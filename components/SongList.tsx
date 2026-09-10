@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Song } from '../types';
-import { Play, MoreHorizontal, Heart, ThumbsDown, ListPlus, Pause, Search, Filter, Check, Globe, Lock, Loader2, ThumbsUp, Share2, Video, Info, Clock } from 'lucide-react';
+import { Play, MoreHorizontal, Heart, ThumbsDown, ListPlus, Pause, Search, Filter, Check, Globe, Lock, Loader2, ThumbsUp, Video, Info, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
-import { ShareModal } from './ShareModal';
 import { AlbumCover } from './AlbumCover';
 import { songsApi } from '../services/api';
 
@@ -468,8 +467,7 @@ const SongItem: React.FC<SongItemProps> = ({
 }) => {
     const { token } = useAuth();
     const [showDropdown, setShowDropdown] = useState(false);
-    const [shareModalOpen, setShareModalOpen] = useState(false);
-    const [imageError, setImageError] = useState(false);
+      const [imageError, setImageError] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editedTitle, setEditedTitle] = useState(song.title);
     const titleInputRef = useRef<HTMLInputElement>(null);
@@ -703,13 +701,6 @@ const SongItem: React.FC<SongItemProps> = ({
                             <ThumbsDown size={16} />
                         </button>
 
-                        <button
-                            className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
-                            onClick={(e) => { e.stopPropagation(); setShareModalOpen(true); }}
-                            title="Share"
-                        >
-                            <Share2 size={16} />
-                        </button>
 
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
@@ -755,7 +746,6 @@ const SongItem: React.FC<SongItemProps> = ({
                                 onReusePrompt={onReusePrompt ? () => onReusePrompt?.(song) : undefined}
                                 onAddToPlaylist={() => onAddToPlaylist?.(song)}
                                 onDelete={() => onDelete?.(song)}
-                                onShare={() => setShareModalOpen(true)}
                                 onUseAsReference={() => onUseAsReference?.()}
                                 onCoverSong={() => onCoverSong?.()}
                             />
@@ -773,12 +763,6 @@ const SongItem: React.FC<SongItemProps> = ({
                 ) : song.duration}
             </div>
         </div>
-
-        <ShareModal
-            isOpen={shareModalOpen}
-            onClose={() => setShareModalOpen(false)}
-            song={song}
-        />
         </>
     );
 };

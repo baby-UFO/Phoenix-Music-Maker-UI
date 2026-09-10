@@ -9,8 +9,7 @@ import {
     Repeat,
     ListPlus,
     Download,
-    Trash2,
-    Share2
+    Trash2
 } from 'lucide-react';
 
 interface SongDropdownMenuProps {
@@ -26,7 +25,6 @@ interface SongDropdownMenuProps {
     onReusePrompt?: () => void;
     onAddToPlaylist?: () => void;
     onDownload?: () => void;
-    onShare?: () => void;
     onDelete?: () => void;
     onUseAsReference?: () => void;
     onCoverSong?: () => void;
@@ -73,7 +71,6 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
     onReusePrompt,
     onAddToPlaylist,
     onDownload,
-    onShare,
     onDelete,
     onUseAsReference,
     onCoverSong
@@ -225,11 +222,6 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
                     onClick={() => (onDownload && f.id === 'original' ? handleAction(onDownload) : handleDownload(f.id))}
                 />
             ))}
-            <MenuItem
-                icon={<Share2 size={14} />}
-                label={t('share')}
-                onClick={() => handleAction(onShare)}
-            />
 
             {/* Owner-only Actions */}
             {isOwner && (
