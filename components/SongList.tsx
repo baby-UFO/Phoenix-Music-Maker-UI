@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Song } from '../types';
-import { Play, MoreHorizontal, Heart, ThumbsDown, ListPlus, Pause, Search, Filter, Check, Globe, Lock, Loader2, ThumbsUp, Video, Info, Clock } from 'lucide-react';
+import { Play, MoreHorizontal, Heart, ThumbsDown, ListPlus, Pause, Search, Filter, Check, Lock, Loader2, ThumbsUp, Video, Info, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
@@ -36,7 +36,7 @@ interface SongListProps {
 
 
 // Define Filter Types
-type FilterType = 'liked' | 'public' | 'private' | 'generating';
+type FilterType = 'liked' | 'generating';
 
 // Map model ID to short display name
 const getModelDisplayName = (modelId?: string): string => {
@@ -119,8 +119,6 @@ export const SongList: React.FC<SongListProps> = ({
 
     const FILTERS: { id: FilterType; label: string; icon: React.ReactNode }[] = [
         { id: 'liked', label: t('liked'), icon: <ThumbsUp size={16} /> },
-        { id: 'public', label: t('public'), icon: <Globe size={16} /> },
-        { id: 'private', label: t('private'), icon: <Lock size={16} /> },
         { id: 'generating', label: t('generatingStatus'), icon: <Loader2 size={16} /> }
     ];
 
@@ -173,8 +171,6 @@ export const SongList: React.FC<SongListProps> = ({
             if (activeFilters.size === 0) return true;
 
             if (activeFilters.has('liked') && !likedSongIds.has(song.id)) return false;
-            if (activeFilters.has('public') && !song.isPublic) return false;
-            if (activeFilters.has('private') && song.isPublic) return false;
             if (activeFilters.has('generating') && !song.isGenerating) return false;
 
             return true;
