@@ -80,6 +80,68 @@ function AppContent() {
   const [showLeftSidebar, setShowLeftSidebar] = useState(true);
   const [pendingAudioSelection, setPendingAudioSelection] = useState<{ target: 'reference' | 'source'; url: string; title?: string } | null>(null);
 
+  // Resizable Create panel (engine controls) width (md+ only)
+  const CREATE_PANEL_WIDTH_KEY = 'phoenix-create-panel-width';
+  const CREATE_PANEL_MIN_WIDTH = 270;
+  const [createPanelWidth, setCreatePanelWidth] = useState(() => {
+    try {
+      const stored = localStorage.getItem(CREATE_PANEL_WIDTH_KEY);
+      if (stored) {
+        const n = parseInt(stored, 10);
+        if (!Number.isNaN(n) && n >= 260 && n <= 640) return n;
+      }
+    } catch { /* ignore */ }
+    return 360;
+  });
+  const [isResizingCreatePanel, setIsResizingCreatePanel] = useState(false);
+  const createLayoutRef = useRef<HTMLDivElement>(null);
+
+  const clampCreatePanelWidth = useCallback((width: number) => {
+    const containerWidth = createLayoutRef.current?.clientWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 1200);
+    const max = Math.min(640, Math.floor(containerWidth * 0.55));
+    return Math.max(CREATE_PANEL_MIN_WIDTH, Math.min(max, Math.round(width)));
+  }, []);
+
+  const handleCreatePanelResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingCreatePanel(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizingCreatePanel) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!createLayoutRef.current) return;
+      const rect = createLayoutRef.current.getBoundingClientRect();
+      setCreatePanelWidth(clampCreatePanelWidth(e.clientX - rect.left));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingCreatePanel(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingCreatePanel, clampCreatePanelWidth]);
+
+  useEffect(() => {
+    if (isResizingCreatePanel) return;
+    try {
+      localStorage.setItem(CREATE_PANEL_WIDTH_KEY, String(createPanelWidth));
+    } catch { /* ignore */ }
+  }, [createPanelWidth, isResizingCreatePanel]);
+
   // Mobile UI Toggle
   const [mobileShowList, setMobileShowList] = useState(false);
 
@@ -1306,12 +1368,15 @@ function AppContent() {
       case 'create':
       default:
         return (
-          <div className="flex h-full overflow-hidden relative w-full">
+          <div ref={createLayoutRef} className="flex h-full overflow-hidden relative w-full">
             {/* Create Panel */}
-            <div className={`
+            <div
+              className={`
               ${mobileShowList ? 'hidden md:block' : 'w-full'}
-              md:w-[320px] lg:w-[360px] flex-shrink-0 h-full border-r border-zinc-200 dark:border-white/5 bg-zinc-50 dark:bg-suno-panel relative z-10 transition-colors duration-300
-            `}>
+              md:w-[var(--create-panel-w)] flex-shrink-0 h-full border-r border-zinc-200 dark:border-white/5 bg-zinc-50 dark:bg-suno-panel relative z-10 transition-colors duration-300
+            `}
+              style={{ ['--create-panel-w' as string]: `${createPanelWidth}px` } as React.CSSProperties}
+            >
               <CreatePanel
                 onGenerate={handleGenerate}
                 isGenerating={isGenerating}
@@ -1320,6 +1385,22 @@ function AppContent() {
                 pendingAudioSelection={pendingAudioSelection}
                 onAudioSelectionApplied={() => setPendingAudioSelection(null)}
               />
+            </div>
+
+            {/* Draggable divider between engine controls and workspace (md+) */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize create panel"
+              onMouseDown={handleCreatePanelResizeStart}
+              className={`
+                hidden md:flex flex-shrink-0 w-1.5 h-full cursor-col-resize z-20
+                items-stretch justify-center
+                group relative
+                ${isResizingCreatePanel ? 'bg-pink-500/40' : 'bg-transparent hover:bg-zinc-300/80 dark:hover:bg-white/10'}
+              `}
+            >
+              <div className={`w-px h-full ${isResizingCreatePanel ? 'bg-pink-500' : 'bg-transparent group-hover:bg-zinc-400 dark:group-hover:bg-white/20'}`} />
             </div>
 
             {/* Song List */}
