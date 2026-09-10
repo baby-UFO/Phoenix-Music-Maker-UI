@@ -1519,8 +1519,8 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           <div className="space-y-5">
             {/* Song Description */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-              <div className="px-3 py-2.5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                <span className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              <div className="px-3 py-2.5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-[#2F5D3A]/[0.06] dark:bg-[#2F5D3A]/20">
+                <span className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A]">
                   {t('describeYourSong')}
                 </span>
                 <button
@@ -1553,7 +1553,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             {/* Vocal Language (Simple) */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
+                <label className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A] px-1">
                   {t('vocalLanguage')}
                 </label>
                 <select
@@ -1567,7 +1567,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
+                <label className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A] px-1">
                   {t('vocalGender')}
                 </label>
                 <div className="flex items-center gap-2">
@@ -1591,7 +1591,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             {/* Quick Settings (Simple Mode) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
-              <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A] flex items-center gap-2">
                 <Sliders size={14} />
                 {t('quickSettings')}
               </h3>
@@ -1624,7 +1624,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               {/* Key & Time Signature */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('key')}</label>
+                  <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('key')}</label>
                   <select
                     value={keyScale}
                     onChange={setKeyScale}
@@ -1637,7 +1637,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('time')}</label>
+                  <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('time')}</label>
                   <select
                     value={timeSignature}
                     onChange={setTimeSignature}
@@ -1686,9 +1686,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               className="bg-white dark:bg-[#1a1a1f] rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden"
             >
               {/* Header with Audio label and tabs */}
-              <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/[0.02]">
+              <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-white/5 bg-[#2F5D3A]/[0.06] dark:bg-[#2F5D3A]/20">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('audio')}</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A]">{t('audio')}</span>
                   <div className="flex items-center gap-1 bg-zinc-200/50 dark:bg-black/30 rounded-lg p-0.5">
                     <button
                       type="button"
@@ -1859,10 +1859,10 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20 relative flex flex-col"
               style={{ height: 'auto' }}
             >
-              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
+              <div className="flex items-center justify-between px-3 py-2.5 bg-[#2F5D3A]/[0.06] dark:bg-[#2F5D3A]/20 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
                 <div>
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('lyrics')}</span>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">{t('leaveLyricsEmpty')}</p>
+                  <span className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A]">{t('lyrics')}</span>
+                  <p className="text-[11px] text-[#5C8F6A] dark:text-[#A3C9AD] mt-0.5">{t('leaveLyricsEmpty')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1910,10 +1910,10 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             {/* Style Input */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20">
-              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
+              <div className="flex items-center justify-between px-3 py-2.5 bg-[#2F5D3A]/[0.06] dark:bg-[#2F5D3A]/20 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('styleOfMusic')}</span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A]">{t('styleOfMusic')}</span>
                     <button
                       onClick={() => setEnhance(!enhance)}
                       className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all cursor-pointer ${enhance ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
@@ -1923,7 +1923,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                       <span>{enhance ? 'ON' : 'OFF'}</span>
                     </button>
                   </div>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">{t('genreMoodInstruments')}</p>
+                  <p className="text-[11px] text-[#5C8F6A] dark:text-[#A3C9AD] mt-0.5">{t('genreMoodInstruments')}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -1983,7 +1983,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             {/* Title Input */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A] border-b border-zinc-100 dark:border-white/5 bg-[#2F5D3A]/[0.06] dark:bg-[#2F5D3A]/20">
                 {t('title')}
               </div>
               <input
@@ -2019,7 +2019,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           {customMode && !instrumental && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
+                <label className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A] px-1">
                   {t('vocalLanguage')}
                 </label>
                 <select
@@ -2033,7 +2033,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
+                <label className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A] px-1">
                   {t('vocalGender')}
                 </label>
                 <div className="flex items-center gap-2">
@@ -2062,20 +2062,20 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           <>
             <button
               onClick={() => setShowLoraPanel(!showLoraPanel)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 text-sm font-medium text-[#2F5D3A] dark:text-[#7CB98A] hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Sliders size={16} className="text-zinc-500" />
-                <span>LoRA</span>
+                <Sliders size={16} className="text-[#3D6B45] dark:text-[#7CB98A]" />
+                <span className="uppercase tracking-wide text-xs font-bold">LoRA</span>
               </div>
-              <ChevronDown size={16} className={`text-zinc-500 transition-transform ${showLoraPanel ? 'rotate-180' : ''}`} />
+              <ChevronDown size={16} className={`text-[#3D6B45] dark:text-[#7CB98A] transition-transform ${showLoraPanel ? 'rotate-180' : ''}`} />
             </button>
 
             {showLoraPanel && (
               <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
                 {/* LoRA Path Input */}
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('loraPath')}</label>
+                  <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('loraPath')}</label>
                   <input
                     type="text"
                     value={loraPath}
@@ -2119,7 +2119,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
                 {/* Use LoRA Checkbox (enable/disable without unloading) */}
                 <div className={`flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5 ${!loraLoaded ? 'opacity-40 pointer-events-none' : ''}`}>
-                  <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD] cursor-pointer">
                     <input
                       type="checkbox"
                       checked={loraEnabled}
@@ -2151,8 +2151,8 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
         {/* MUSIC PARAMETERS */}
         <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
-          <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-2">
-            <Sliders size={14} />
+          <h3 className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A] flex items-center gap-2">
+            <Sliders size={14} className="text-[#3D6B45] dark:text-[#7CB98A]" />
             {t('musicParameters')}
           </h3>
 
@@ -2171,7 +2171,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           {/* Key & Time Signature */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Key</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">Key</label>
               <select
                 value={keyScale}
                 onChange={(e) => setKeyScale(e.target.value)}
@@ -2184,7 +2184,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Time</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">Time</label>
               <select
                 value={timeSignature}
                 onChange={(e) => setTimeSignature(e.target.value)}
@@ -2202,19 +2202,19 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         {/* ADVANCED SETTINGS */}
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 text-sm font-medium text-[#2F5D3A] dark:text-[#7CB98A] hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <Settings2 size={16} className="text-zinc-500" />
-            <span>{t('advancedSettings')}</span>
+            <Settings2 size={16} className="text-[#3D6B45] dark:text-[#7CB98A]" />
+            <span className="uppercase tracking-wide text-xs font-bold">{t('advancedSettings')}</span>
           </div>
-          <ChevronDown size={16} className={`text-zinc-500 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          <ChevronDown size={16} className={`text-[#3D6B45] dark:text-[#7CB98A] transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
         </button>
 
         {showAdvanced && (
           <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
             {/* Load Parameters from JSON */}
-            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-zinc-300 dark:border-white/15 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors">
+            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-zinc-300 dark:border-white/15 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD] hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors">
               <Upload size={14} />
               Load Parameters (JSON)
               <input
@@ -2253,7 +2253,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             {/* Bulk Generate */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('bulkGenerate')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('bulkGenerate')}</label>
                 <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">
                   {bulkCount} {t(bulkCount === 1 ? 'job' : 'jobs')}
                 </span>
@@ -2304,7 +2304,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             {/* Audio Format & Inference Method */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('audioFormat')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('audioFormat')}</label>
                 <select
                   value={audioFormat}
                   onChange={(e) => setAudioFormat(e.target.value as 'mp3' | 'flac')}
@@ -2315,7 +2315,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Deterministic is more repeatable; stochastic adds randomness.">{t('inferMethod')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Deterministic is more repeatable; stochastic adds randomness.">{t('inferMethod')}</label>
                 <select
                   value={inferMethod}
                   onChange={(e) => setInferMethod(e.target.value as 'ode' | 'sde')}
@@ -2329,7 +2329,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             {/* LM Backend */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('lmBackendLabel')}</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('lmBackendLabel')}</label>
               <select
                 value={lmBackend}
                 onChange={(e) => setLmBackend(e.target.value as 'pt' | 'vllm')}
@@ -2343,7 +2343,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             {/* LM Model */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('lmModelLabel')}</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('lmModelLabel')}</label>
               <select
                 value={lmModel}
                 onChange={(e) => { const v = e.target.value; setLmModel(v); lsSet(storageKeys.lmModel.primary, v, storageKeys.lmModel.legacy); }}
@@ -2361,7 +2361,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Dices size={14} className="text-zinc-500" />
-                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Fixing the seed makes results repeatable. Random is recommended for variety.">{t('seed')}</span>
+                  <span className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Fixing the seed makes results repeatable. Random is recommended for variety.">{t('seed')}</span>
                 </div>
                 <button
                   onClick={() => setRandomSeed(!randomSeed)}
@@ -2411,7 +2411,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             {/* Divider */}
             <div className="border-t border-zinc-200 dark:border-white/10 pt-4">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide font-bold mb-3">{t('expertControls')}</p>
+              <p className="text-[10px] uppercase tracking-wide font-bold mb-3 text-[#5C8F6A] dark:text-[#A3C9AD]">{t('expertControls')}</p>
             </div>
 
             {uploadError && (
@@ -2486,7 +2486,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
                 {/* LM Negative Prompt */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Words or ideas to steer the lyric model away from.">{t('lmNegativePrompt')}</label>
+                  <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Words or ideas to steer the lyric model away from.">{t('lmNegativePrompt')}</label>
                   <textarea
                     value={lmNegativePrompt}
                     onChange={(e) => setLmNegativePrompt(e.target.value)}
@@ -2499,11 +2499,11 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             )}
 
             <div className="space-y-1">
-              <h4 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide" title="Controls how much the output follows the input audio.">{t('transform')}</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A]" title="Controls how much the output follows the input audio.">{t('transform')}</h4>
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{t('controlSourceAudio')}</p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Advanced: precomputed audio codes for conditioning.">{t('audioCodes')}</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Advanced: precomputed audio codes for conditioning.">{t('audioCodes')}</label>
               <textarea
                 value={audioCodes}
                 onChange={(e) => setAudioCodes(e.target.value)}
@@ -2541,7 +2541,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Choose text-to-music or audio-based modes.">{t('taskType')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Choose text-to-music or audio-based modes.">{t('taskType')}</label>
                 <select
                   value={taskType}
                   onChange={(e) => setTaskType(e.target.value)}
@@ -2554,7 +2554,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="How strongly the source audio shapes the result.">{t('audioCoverStrength')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="How strongly the source audio shapes the result.">{t('audioCoverStrength')}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -2569,7 +2569,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Start time for the region to repaint (seconds).">{t('repaintingStart')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Start time for the region to repaint (seconds).">{t('repaintingStart')}</label>
                 <input
                   type="number"
                   step="0.1"
@@ -2579,7 +2579,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="End time for the region to repaint (seconds).">{t('repaintingEnd')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="End time for the region to repaint (seconds).">{t('repaintingEnd')}</label>
                 <input
                   type="number"
                   step="0.1"
@@ -2591,7 +2591,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Additional directives to guide generation.">{t('instruction')}</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Additional directives to guide generation.">{t('instruction')}</label>
               <textarea
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
@@ -2600,12 +2600,12 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             </div>
 
             <div className="space-y-1">
-              <h4 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('guidance')}</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wide text-[#2F5D3A] dark:text-[#7CB98A]">{t('guidance')}</h4>
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{t('advancedCfgScheduling')}</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Fraction of the diffusion process to start applying guidance.">{t('cfgIntervalStart')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Fraction of the diffusion process to start applying guidance.">{t('cfgIntervalStart')}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -2617,7 +2617,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Fraction of the diffusion process to stop applying guidance.">{t('cfgIntervalEnd')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Fraction of the diffusion process to stop applying guidance.">{t('cfgIntervalEnd')}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -2631,7 +2631,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Override the default timestep schedule (advanced).">{t('customTimesteps')}</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Override the default timestep schedule (advanced).">{t('customTimesteps')}</label>
               <input
                 type="text"
                 value={customTimesteps}
@@ -2643,7 +2643,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Scales score-based guidance (advanced).">{t('scoreScale')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Scales score-based guidance (advanced).">{t('scoreScale')}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -2655,7 +2655,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Bigger chunks can be faster but use more memory.">{t('lmBatchChunkSize')}</label>
+                <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Bigger chunks can be faster but use more memory.">{t('lmBatchChunkSize')}</label>
                 <input
                   type="number"
                   min="1"
@@ -2669,7 +2669,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('trackName')}</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('trackName')}</label>
               <select
                 value={trackName}
                 onChange={(e) => setTrackName(e.target.value)}
@@ -2683,7 +2683,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('completeTrackClasses')}</label>
+              <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]">{t('completeTrackClasses')}</label>
               <div className="flex flex-wrap gap-2">
                 {TRACK_NAMES.map(name => {
                   const selected = completeTrackClasses.split(',').map(s => s.trim()).filter(Boolean);
@@ -2710,45 +2710,45 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             <div className="grid grid-cols-2 gap-3">
               <label
-                className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400"
+                className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]"
                 title="Adaptive Dual Guidance: dynamically adjusts CFG for quality. Base model only; slower."
               >
                 <input type="checkbox" checked={useAdg} onChange={() => setUseAdg(!useAdg)} />
                 {t('useAdg')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Allow the LM to run in larger batches for speed (more VRAM).">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Allow the LM to run in larger batches for speed (more VRAM).">
                 <input type="checkbox" checked={allowLmBatch} onChange={() => setAllowLmBatch(!allowLmBatch)} />
                 {t('allowLmBatch')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Let the LM reason about metadata like BPM, key, duration.">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Let the LM reason about metadata like BPM, key, duration.">
                 <input type="checkbox" checked={useCotMetas} onChange={() => setUseCotMetas(!useCotMetas)} />
                 {t('useCotMetas')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Let the LM reason about the caption/style text.">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Let the LM reason about the caption/style text.">
                 <input type="checkbox" checked={useCotCaption} onChange={() => setUseCotCaption(!useCotCaption)} />
                 {t('useCotCaption')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Let the LM reason about language selection.">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Let the LM reason about language selection.">
                 <input type="checkbox" checked={useCotLanguage} onChange={() => setUseCotLanguage(!useCotLanguage)} />
                 {t('useCotLanguage')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Auto-generate missing fields when possible.">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Auto-generate missing fields when possible.">
                 <input type="checkbox" checked={autogen} onChange={() => setAutogen(!autogen)} />
                 {t('autogen')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Include debug info for constrained decoding.">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Include debug info for constrained decoding.">
                 <input type="checkbox" checked={constrainedDecodingDebug} onChange={() => setConstrainedDecodingDebug(!constrainedDecodingDebug)} />
                 {t('constrainedDecodingDebug')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Use the formatted caption produced by the AI formatter.">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Use the formatted caption produced by the AI formatter.">
                 <input type="checkbox" checked={isFormatCaption} onChange={() => setIsFormatCaption(!isFormatCaption)} />
                 {t('formatCaption')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Return scorer outputs for diagnostics.">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Return scorer outputs for diagnostics.">
                 <input type="checkbox" checked={getScores} onChange={() => setGetScores(!getScores)} />
                 {t('getScores')}
               </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Return synced lyric (LRC) output when available.">
+              <label className="flex items-center gap-2 text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title="Return synced lyric (LRC) output when available.">
                 <input type="checkbox" checked={getLrc} onChange={() => setGetLrc(!getLrc)} />
                 {t('getLrcLyrics')}
               </label>
@@ -2801,7 +2801,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                   input.click();
                 }}
                 disabled={isUploadingReference || isTranscribingReference}
-                className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 bg-zinc-50 dark:bg-white/5 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 hover:border-zinc-400 dark:hover:border-white/30 transition-all"
+                className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 bg-[#2F5D3A]/[0.06] dark:bg-[#2F5D3A]/20 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 hover:border-zinc-400 dark:hover:border-white/30 transition-all"
               >
                 {isUploadingReference ? (
                   <>

@@ -64,7 +64,7 @@ export const EditableSlider: React.FC<EditableSliderProps> = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title={title}>{label}</label>
+        <label className="text-xs font-medium text-[#5C8F6A] dark:text-[#A3C9AD]" title={title}>{label}</label>
         {isEditing ? (
           <input
             type="number"
