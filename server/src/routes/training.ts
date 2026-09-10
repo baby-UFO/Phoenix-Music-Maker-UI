@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getGradioClient } from '../services/gradio-client.js';
 import { config } from '../config/index.js';
-import { resolvePythonPath } from '../services/acestep.js';
+import { resolvePythonPath } from '../services/phoenixEngine.js';
 import multer from 'multer';
 import path from 'path';
 import { createWriteStream, existsSync, mkdirSync, readdirSync, statSync, readFileSync } from 'fs';
@@ -73,10 +73,14 @@ function getAudioDuration(filePath: string): number {
 }
 
 // Resolve ACE-Step base directory
-function getAceStepDir(): string {
-  const envPath = process.env.ACESTEP_PATH;
+function getPhoenixEngineDir(): string {
+  const envPath = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH;
   if (envPath) {
     return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
+  }
+  if (config.phoenixEngine?.path) {
+    const pth = config.phoenixEngine.path;
+    return path.isAbsolute(pth) ? pth : path.resolve(process.cwd(), pth);
   }
   return path.resolve(config.datasets.dir, '..');
 }
@@ -292,7 +296,7 @@ router.post('/build-dataset', authMiddleware, async (req: AuthenticatedRequest, 
 router.get('/audio', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     let filePath: string;
-    const aceStepDir = getAceStepDir();
+    const engineDir = getPhoenixEngineDir();
 
     if (req.query.path) {
       filePath = req.query.path as string;
@@ -306,8 +310,8 @@ router.get('/audio', authMiddleware, async (req: AuthenticatedRequest, res: Resp
 
     // Path traversal protection
     const resolved = path.resolve(filePath);
-    if (resolved.includes('..') || !resolved.startsWith(aceStepDir)) {
-      res.status(403).json({ error: 'Access denied: path outside ACE-Step directory' });
+    if (resolved.includes('..') || !resolved.startsWith(engineDir)) {
+      res.status(403).json({ error: 'Access denied: path outside Phoenix Engine directory' });
       return;
     }
 
@@ -343,15 +347,15 @@ router.post('/preprocess', authMiddleware, async (req: AuthenticatedRequest, res
       return;
     }
 
-    const aceStepDir = getAceStepDir();
+    const engineDir = getPhoenixEngineDir();
     const scriptPath = path.resolve(__dirname, '../../scripts/preprocess_dataset.py');
-    const pythonPath = resolvePythonPath(aceStepDir);
+    const pythonPath = resolvePythonPath(engineDir);
     const rawDataset = typeof datasetPath === 'string'
       ? datasetPath
       : String((datasetPath && (datasetPath.path || datasetPath.value)) || '');
     const resolvedDataset = path.isAbsolute(rawDataset)
       ? rawDataset
-      : path.resolve(aceStepDir, rawDataset);
+      : path.resolve(engineDir, rawDataset);
     if (!existsSync(resolvedDataset)) {
       res.status(400).json({ error: `Dataset file not found: ${resolvedDataset}` });
       return;
@@ -359,7 +363,7 @@ router.post('/preprocess', authMiddleware, async (req: AuthenticatedRequest, res
     const rawOutput = outputDir || path.join(config.datasets.dir, 'preprocessed_tensors');
     const resolvedOutput = path.isAbsolute(rawOutput)
       ? rawOutput
-      : path.resolve(aceStepDir, rawOutput);
+      : path.resolve(engineDir, rawOutput);
 
     // Ensure output dir exists
     await mkdir(resolvedOutput, { recursive: true });
@@ -371,7 +375,7 @@ router.post('/preprocess', authMiddleware, async (req: AuthenticatedRequest, res
       '--output', resolvedOutput,
       '--json',
     ], {
-      cwd: aceStepDir,
+      cwd: engineDir,
       env: { ...process.env },
     });
 
@@ -434,10 +438,10 @@ router.post('/scan-directory', authMiddleware, async (req: AuthenticatedRequest,
     }
 
     // Resolve path — if relative, resolve from ACE-Step dir
-    const aceStepDir = getAceStepDir();
+    const engineDir = getPhoenixEngineDir();
     const resolvedDir = path.isAbsolute(audioDir)
       ? audioDir
-      : path.resolve(aceStepDir, audioDir);
+      : path.resolve(engineDir, audioDir);
 
     if (!existsSync(resolvedDir)) {
       res.status(400).json({ error: `Directory not found: ${audioDir}` });
@@ -519,7 +523,7 @@ router.post('/auto-label', authMiddleware, async (req: AuthenticatedRequest, res
       // Lambda endpoints aren't named — suggest using Gradio UI
       res.status(501).json({
         error: 'Auto-labeling requires the Gradio UI. The model must be initialized and the dataset loaded in the Gradio training tab.',
-        hint: 'Use the Gradio UI at the ACE-Step server URL to auto-label your dataset, then reload it here.',
+        hint: 'Use the Gradio UI at the Phoenix Engine server URL to auto-label your dataset, then reload it here.',
       });
     }
   } catch (error) {
@@ -572,7 +576,7 @@ router.post('/init-model', authMiddleware, async (req: AuthenticatedRequest, res
       // Lambda endpoints aren't named — suggest using Gradio UI
       res.status(501).json({
         error: 'Model initialization requires the Gradio UI.',
-        hint: 'Initialize the model in the ACE-Step Gradio UI service configuration section, then return here for training.',
+        hint: 'Initialize the model in the Phoenix Engine Gradio UI service configuration section, then return here for training.',
       });
     }
   } catch (error) {
@@ -584,8 +588,8 @@ router.post('/init-model', authMiddleware, async (req: AuthenticatedRequest, res
 // GET /api/training/checkpoints — List available model checkpoints
 router.get('/checkpoints', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    const aceStepDir = getAceStepDir();
-    const checkpointDir = path.join(aceStepDir, 'checkpoints');
+    const engineDir = getPhoenixEngineDir();
+    const checkpointDir = path.join(engineDir, 'checkpoints');
     if (!existsSync(checkpointDir)) {
       res.json({ checkpoints: [], configs: [] });
       return;
@@ -614,10 +618,10 @@ router.get('/checkpoints', authMiddleware, async (_req: AuthenticatedRequest, re
 router.get('/lora-checkpoints', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const outputDir = (req.query.dir as string) || './lora_output';
-    const aceStepDir = getAceStepDir();
+    const engineDir = getPhoenixEngineDir();
     const resolvedDir = path.isAbsolute(outputDir)
       ? outputDir
-      : path.resolve(aceStepDir, outputDir);
+      : path.resolve(engineDir, outputDir);
 
     if (!existsSync(resolvedDir)) {
       res.json({ checkpoints: [] });
@@ -780,7 +784,7 @@ router.post('/save-dataset', authMiddleware, async (req: AuthenticatedRequest, r
   try {
     const { savePath, datasetName, customTag, tagPosition, allInstrumental, genreRatio } = req.body;
     const name = (datasetName ?? 'my_lora_dataset').toString().trim() || 'my_lora_dataset';
-    const engineRoot = process.env.ACESTEP_PATH || 'E:\\ACE-Step-1.5';
+    const engineRoot = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || 'E:\\ACE-Step-1.5';
     const requested = (savePath ?? `./datasets/${name}.json`).toString().trim();
     const dest = path.isAbsolute(requested)
       ? requested
@@ -850,16 +854,16 @@ router.post('/start', authMiddleware, async (req: AuthenticatedRequest, res: Res
       seed, outputDir,
     } = req.body ?? {};
 
-    const aceStepDir = config.acestep?.path || 'E:\\ACE-Step-1.5';
+    const engineDir = config.phoenixEngine?.path || 'E:\\ACE-Step-1.5';
     const resolveOut = (value: unknown, fallback: string) => {
       const raw = typeof value === 'string' && value.trim() ? value.trim() : fallback;
-      return path.isAbsolute(raw) ? raw : path.resolve(aceStepDir, raw.replace(/^\.[\\/]/, ''));
+      return path.isAbsolute(raw) ? raw : path.resolve(engineDir, raw.replace(/^\.[\\/]/, ''));
     };
-    const tensorPath = resolveOut(tensorDir, path.join(aceStepDir, 'datasets', 'preprocessed_tensors'));
-    const outputPath = resolveOut(outputDir, path.join(aceStepDir, 'lora_output'));
+    const tensorPath = resolveOut(tensorDir, path.join(engineDir, 'datasets', 'preprocessed_tensors'));
+    const outputPath = resolveOut(outputDir, path.join(engineDir, 'lora_output'));
     const scriptPath = path.resolve(__dirname, '../../scripts/start_lora.py');
     const logPath = path.resolve(__dirname, '../../train-run.log');
-    const child = spawn(resolvePythonPath(aceStepDir), [
+    const child = spawn(resolvePythonPath(engineDir), [
       scriptPath,
       '--tensor-dir', tensorPath,
       '--output', outputPath,
@@ -873,7 +877,7 @@ router.post('/start', authMiddleware, async (req: AuthenticatedRequest, res: Res
       '--save-every', String(saveEvery ?? 10),
       '--seed', String(seed ?? 42),
     ], {
-      cwd: aceStepDir,
+      cwd: engineDir,
       detached: true,
       stdio: 'ignore',
       windowsHide: true,

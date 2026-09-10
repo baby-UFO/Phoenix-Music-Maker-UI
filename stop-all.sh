@@ -1,7 +1,7 @@
 #!/bin/bash
-# ACE-Step UI Stop All Services Script
+# Phoenix Music Maker UI Stop All Services Script
 
-echo "Stopping all ACE-Step services..."
+echo "Stopping all Phoenix Engine services..."
 
 if [ -f logs/api.pid ]; then
     API_PID=$(cat logs/api.pid)

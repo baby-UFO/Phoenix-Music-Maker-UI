@@ -62,7 +62,7 @@ echo.
 echo Next steps:
 echo.
 echo   1. Start Phoenix Engine API (in engine folder):
-echo      cd path\to\ACE-Step
+echo      cd path\to\Phoenix Engine
 echo      uv run acestep-api --port 8001
 echo.
 echo   2. Start Phoenix Music Maker:

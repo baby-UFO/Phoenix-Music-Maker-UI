@@ -26,15 +26,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const AUDIO_DIR = path.join(__dirname, '../../public/audio');
 
-const ACESTEP_API = config.acestep.apiUrl;
+const ENGINE_API = config.phoenixEngine.apiUrl;
 
-// Resolve ACE-Step path (from env or default relative path)
-function resolveAceStepPath(): string {
-  const envPath = process.env.ACESTEP_PATH;
+// Resolve Phoenix Engine path (from env or default relative path)
+function resolvePhoenixEnginePath(): string {
+  const envPath = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH;
   if (envPath) {
     return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
   }
-  // Default: sibling directory (server/src/services -> ../../../ACE-Step-1.5 = app/ACE-Step-1.5)
+  // Default: sibling Phoenix Engine install folder (legacy path name ACE-Step-1.5)
   return path.resolve(__dirname, '../../../ACE-Step-1.5');
 }
 
@@ -72,7 +72,7 @@ export function resolvePythonPath(baseDir: string): string {
   return path.join(baseDir, 'env', 'bin', 'python');
 }
 
-const ACESTEP_DIR = resolveAceStepPath();
+const ENGINE_DIR = resolvePhoenixEnginePath();
 const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
 const PYTHON_SCRIPT = path.join(SCRIPTS_DIR, 'simple_generate.py');
 
@@ -460,7 +460,7 @@ export async function checkSpaceHealth(): Promise<boolean> {
 
 async function getActiveModel(): Promise<string | null> {
   try {
-    const res = await fetch(`${ACESTEP_API}/v1/models`);
+    const res = await fetch(`${ENGINE_API}/v1/models`);
     if (!res.ok) return null;
     const data = await res.json() as any;
     const models = data?.data?.models || data?.models || [];
@@ -475,7 +475,7 @@ async function switchModelIfNeeded(ditModel: string): Promise<void> {
   if (activeModel === ditModel) return; // already loaded, no-op
 
   console.log(`[Model] Switching from '${activeModel ?? 'unknown'}' to '${ditModel}'`);
-  const res = await fetch(`${ACESTEP_API}/v1/init`, {
+  const res = await fetch(`${ENGINE_API}/v1/init`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: ditModel, init_llm: false }),
@@ -490,7 +490,7 @@ async function switchModelIfNeeded(ditModel: string): Promise<void> {
 
 // Discover endpoints (for compatibility)
 export async function discoverEndpoints(): Promise<unknown> {
-  return { provider: 'acestep-gradio', endpoint: ACESTEP_API };
+  return { provider: 'phoenix-engine-gradio', endpoint: ENGINE_API };
 }
 
 // Reset client — forces Gradio reconnection on next request
@@ -747,7 +747,7 @@ async function processGenerationViaPython(
   });
 
   try {
-    const jobOutputDir = path.join(ACESTEP_DIR, 'output', jobId);
+    const jobOutputDir = path.join(ENGINE_DIR, 'output', jobId);
     await mkdir(jobOutputDir, { recursive: true });
 
     const durationToSend = params.duration && params.duration > 0 ? params.duration : 60;
@@ -855,7 +855,7 @@ async function processGenerationViaPython(
     job.error = error instanceof Error ? error.message : 'Generation failed';
 
     try {
-      const jobOutputDir = path.join(ACESTEP_DIR, 'output', jobId);
+      const jobOutputDir = path.join(ENGINE_DIR, 'output', jobId);
       await rm(jobOutputDir, { recursive: true, force: true });
     } catch { /* ignore cleanup errors */ }
   }
@@ -870,14 +870,14 @@ interface PythonResult {
 
 function runPythonGeneration(scriptArgs: string[], timeoutMs = 600000): Promise<PythonResult> {
   return new Promise((resolve) => {
-    const pythonPath = resolvePythonPath(ACESTEP_DIR);
+    const pythonPath = resolvePythonPath(ENGINE_DIR);
     const args = [PYTHON_SCRIPT, ...scriptArgs];
 
     const proc = spawn(pythonPath, args, {
-      cwd: ACESTEP_DIR,
+      cwd: ENGINE_DIR,
       env: {
         ...process.env,
-        ACESTEP_PATH: ACESTEP_DIR,
+        ACESTEP_PATH: ENGINE_DIR,
       },
     });
 
@@ -900,7 +900,7 @@ function runPythonGeneration(scriptArgs: string[], timeoutMs = 600000): Promise<
       const lines = data.toString().split('\n');
       for (const line of lines) {
         if (line.trim()) {
-          console.log(`[ACE-Step] ${line}`);
+          console.log(`[Phoenix Engine] ${line}`);
         }
       }
     });
@@ -1026,7 +1026,7 @@ export async function getAudioStream(audioPath: string): Promise<Response> {
     }
   }
 
-  const url = `${ACESTEP_API}/v1/audio?path=${encodeURIComponent(audioPath)}`;
+  const url = `${ENGINE_API}/v1/audio?path=${encodeURIComponent(audioPath)}`;
   console.log('Fetching audio from:', url);
   return fetch(url);
 }

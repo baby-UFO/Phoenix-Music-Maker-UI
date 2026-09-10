@@ -483,7 +483,7 @@ cron.schedule('0 3 * * *', async () => {
 app.listen(config.port, '0.0.0.0', () => {
   console.log(`Phoenix Music Maker Server running on http://localhost:${config.port}`);
   console.log(`Environment: ${config.nodeEnv}`);
-  console.log(`Phoenix Engine API: ${config.acestep.apiUrl}`);
+  console.log(`Phoenix Engine API: ${config.phoenixEngine.apiUrl}`);
 
   // Show LAN access info
   import('os').then(os => {

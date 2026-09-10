@@ -1,4 +1,4 @@
-import type { GenerationParams } from './acestep.js';
+import type { GenerationParams } from './phoenixEngine.js';
 
 type Tier = 'free' | 'pro' | 'unlimited';
 

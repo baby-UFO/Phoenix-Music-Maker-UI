@@ -1,36 +1,36 @@
 #!/bin/bash
-# ACE-Step UI Setup Script
+# Phoenix Music Maker UI Setup Script
 
 set -e
 
 echo "=================================="
-echo "  ACE-Step UI Setup"
+echo "  Phoenix Music Maker UI Setup"
 echo "=================================="
 
-# Check if ACE-Step exists
-ACESTEP_PATH="${ACESTEP_PATH:-../ACE-Step-1.5}"
+# Check if Phoenix Engine exists
+ACESTEP_PATH="${ACESTEP_PATH:-../Phoenix Engine-1.5}"
 
 if [ ! -d "$ACESTEP_PATH" ]; then
-    echo "Error: ACE-Step not found at $ACESTEP_PATH"
+    echo "Error: Phoenix Engine not found at $ACESTEP_PATH"
     echo ""
-    echo "Please clone ACE-Step first:"
+    echo "Please clone Phoenix Engine first:"
     echo "  cd .."
-    echo "  git clone https://github.com/ace-step/ACE-Step-1.5"
-    echo "  cd ACE-Step-1.5"
+    echo "  git clone https://github.com/ace-step/Phoenix Engine-1.5"
+    echo "  cd Phoenix Engine-1.5"
     echo "  uv venv && uv pip install -e ."
-    echo "  cd ../ace-step-ui"
+    echo "  cd ../Phoenix-Music-Maker-UI"
     echo "  ./setup.sh"
     exit 1
 fi
 
 if [ ! -d "$ACESTEP_PATH/.venv" ]; then
-    echo "Error: ACE-Step venv not found. Please set up ACE-Step first:"
+    echo "Error: Phoenix Engine venv not found. Please set up Phoenix Engine first:"
     echo "  cd $ACESTEP_PATH"
     echo "  uv venv && uv pip install -e ."
     exit 1
 fi
 
-echo "Found ACE-Step at: $ACESTEP_PATH"
+echo "Found Phoenix Engine at: $ACESTEP_PATH"
 
 # Get absolute path
 ACESTEP_PATH=$(cd "$ACESTEP_PATH" && pwd)
@@ -38,9 +38,9 @@ ACESTEP_PATH=$(cd "$ACESTEP_PATH" && pwd)
 # Create .env file
 echo "Creating .env file..."
 cat > .env << EOF
-# ACE-Step UI Configuration
+# Phoenix Music Maker UI Configuration
 
-# Path to ACE-Step installation
+# Path to Phoenix Engine installation
 ACESTEP_PATH=$ACESTEP_PATH
 
 # Server ports

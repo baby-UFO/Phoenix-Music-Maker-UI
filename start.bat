@@ -32,7 +32,7 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
 echo Starting Phoenix Music Maker...
 echo.
 echo Make sure Phoenix Engine API is running:
-echo   cd path\to\ACE-Step
+echo   cd path\to\Phoenix Engine
 echo   uv run acestep-api --port 8001
 echo.
 echo ==================================

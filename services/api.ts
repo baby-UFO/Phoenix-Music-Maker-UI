@@ -386,7 +386,7 @@ export const generateApi = {
     vocalLanguage: string;
   }> => api('/api/generate/random-description', { token }),
 
-  // LoRA Inference (requires ACE-Step training fork)
+  // LoRA Inference (requires Phoenix Engine training fork)
   loadLora: (params: {
     lora_path: string;
   }, token: string): Promise<{

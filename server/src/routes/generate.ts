@@ -17,7 +17,7 @@ import {
   getJobRawResponse,
   downloadAudioToBuffer,
   resolvePythonPath,
-} from '../services/acestep.js';
+} from '../services/phoenixEngine.js';
 import { getStorageProvider } from '../services/storage/factory.js';
 
 const router = Router();
@@ -611,8 +611,8 @@ router.get('/endpoints', authMiddleware, async (_req: AuthenticatedRequest, res:
 
 router.get('/models', async (_req, res: Response) => {
   try {
-    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
-    const checkpointsDir = path.join(ACESTEP_DIR, 'checkpoints');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const checkpointsDir = path.join(PHOENIX_ENGINE_DIR, 'checkpoints');
 
     // All known DiT models from Gradio's model_downloader.py registry:
     // - MAIN_MODEL_COMPONENTS includes "acestep-v15-turbo" (bundled with main download)
@@ -629,7 +629,7 @@ router.get('/models', async (_req, res: Response) => {
     // Query Gradio /v1/models to get the currently loaded/active model
     let activeModel: string | null = null;
     try {
-      const apiRes = await fetch(`${config.acestep.apiUrl}/v1/models`);
+      const apiRes = await fetch(`${config.phoenixEngine.apiUrl}/v1/models`);
       if (apiRes.ok) {
         const data = await apiRes.json() as any;
         const gradioModels = data?.data?.models || data?.models || [];
@@ -709,28 +709,28 @@ router.get('/random-description', authMiddleware, async (_req: AuthenticatedRequ
 router.get('/health', async (_req, res: Response) => {
   try {
     const healthy = await checkSpaceHealth();
-    res.json({ healthy, aceStepUrl: config.acestep.apiUrl });
+    res.json({ healthy, phoenixEngineUrl: config.phoenixEngine.apiUrl });
   } catch (error) {
-    res.json({ healthy: false, aceStepUrl: config.acestep.apiUrl, error: (error as Error).message });
+    res.json({ healthy: false, phoenixEngineUrl: config.phoenixEngine.apiUrl, error: (error as Error).message });
   }
 });
 
 router.get('/limits', async (_req, res: Response) => {
   try {
     const { spawn } = await import('child_process');
-    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
     const LIMITS_SCRIPT = path.join(SCRIPTS_DIR, 'get_limits.py');
-    const pythonPath = resolvePythonPath(ACESTEP_DIR);
+    const pythonPath = resolvePythonPath(PHOENIX_ENGINE_DIR);
 
     const result = await new Promise<{ success: boolean; data?: any; error?: string }>((resolve) => {
       const proc = spawn(pythonPath, [LIMITS_SCRIPT], {
-        cwd: ACESTEP_DIR,
+        cwd: PHOENIX_ENGINE_DIR,
         env: {
           ...process.env,
-          ACESTEP_PATH: ACESTEP_DIR,
+          ACESTEP_PATH: PHOENIX_ENGINE_DIR, PHOENIX_ENGINE_PATH: PHOENIX_ENGINE_DIR,
         },
       });
 
@@ -792,7 +792,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
       return;
     }
 
-    const ACESTEP_API_URL = config.acestep.apiUrl;
+    const PHOENIX_ENGINE_API_URL = config.phoenixEngine.apiUrl;
 
     // Build param_obj for the REST API
     const paramObj: Record<string, unknown> = {};
@@ -803,8 +803,8 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
     // Primary path: call ACE-Step's /format_input REST endpoint (avoids Python spawn ENOENT on Windows)
     try {
-      console.log(`[Format] Calling REST API: ${ACESTEP_API_URL}/format_input`);
-      const apiRes = await fetch(`${ACESTEP_API_URL}/format_input`, {
+      console.log(`[Format] Calling REST API: ${PHOENIX_ENGINE_API_URL}/format_input`);
+      const apiRes = await fetch(`${PHOENIX_ENGINE_API_URL}/format_input`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -849,12 +849,12 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
     // Fallback: Python spawn (only reached when REST API is unreachable)
     const { spawn } = await import('child_process');
-    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
     const FORMAT_SCRIPT = path.join(SCRIPTS_DIR, 'format_sample.py');
-    const pythonPath = resolvePythonPath(ACESTEP_DIR);
+    const pythonPath = resolvePythonPath(PHOENIX_ENGINE_DIR);
 
     const args = [FORMAT_SCRIPT, '--caption', caption, '--json'];
     if (lyrics) args.push('--lyrics', lyrics);
@@ -871,8 +871,8 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
     console.log(`[Format] Fallback spawn: ${pythonPath} ${args.join(' ')}`);
     const result = await new Promise<{ success: boolean; data?: any; error?: string }>((resolve) => {
       const proc = spawn(pythonPath, args, {
-        cwd: ACESTEP_DIR,
-        env: { ...process.env, ACESTEP_PATH: ACESTEP_DIR },
+        cwd: PHOENIX_ENGINE_DIR,
+        env: { ...process.env, ACESTEP_PATH: PHOENIX_ENGINE_DIR, PHOENIX_ENGINE_PATH: PHOENIX_ENGINE_DIR },
       });
 
       let stdout = '';
