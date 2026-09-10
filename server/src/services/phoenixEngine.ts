@@ -1,6 +1,6 @@
 import { writeFile, mkdir, copyFile, rm, readFile } from 'fs/promises';
 import { spawn, execSync } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import path from 'path';
 import { handle_file } from '@gradio/client';
 
@@ -544,34 +544,128 @@ export async function checkSpaceHealth(): Promise<boolean> {
 // Model switching — call /v1/init to change the active DiT model
 // ---------------------------------------------------------------------------
 
+/** Last DiT model we successfully targeted (engine /v1/models often returns "unknown"). */
+let lastRequestedDitModel: string | null = null;
+
+const TURBO_STEPS_CAP = 8;
+const PREFERRED_NON_TURBO = 'acestep-v15-base';
+const FALLBACK_NON_TURBO = 'acestep-v15-sft';
+
+function isTurboDitModel(model?: string | null): boolean {
+  return !!model && model.toLowerCase().includes('turbo');
+}
+
+function checkpointDirFor(model: string): string {
+  return path.join(ENGINE_DIR, 'checkpoints', model);
+}
+
+function isCheckpointOnDisk(model: string): boolean {
+  const dir = checkpointDirFor(model);
+  if (!existsSync(dir)) return false;
+  // Prefer a real weight file if present; otherwise accept non-empty dir with config.json
+  try {
+    const entries = readdirSync(dir) as string[];
+    if (entries.some((e) => /\.(safetensors|bin|pt|ckpt)$/i.test(e))) return true;
+    return entries.includes('config.json');
+  } catch {
+    return false;
+  }
+}
+
+function resolveNonTurboDitModel(): string {
+  if (isCheckpointOnDisk(PREFERRED_NON_TURBO)) return PREFERRED_NON_TURBO;
+  if (isCheckpointOnDisk(FALLBACK_NON_TURBO)) return FALLBACK_NON_TURBO;
+  return PREFERRED_NON_TURBO;
+}
+
+/**
+ * If turbo + high steps, force a non-turbo DiT so engine turbo clamp (infer_steps>8→8) does not apply.
+ * Mutates params in place. Does NOT remove the engine clamp — wrong architecture.
+ */
+function enforceNonTurboForHighSteps(params: GenerationParams): void {
+  const steps = params.inferenceSteps ?? 8;
+  if (steps <= TURBO_STEPS_CAP) return;
+  if (!isTurboDitModel(params.ditModel) && params.ditModel) return;
+
+  const target = resolveNonTurboDitModel();
+  if (isTurboDitModel(params.ditModel) || !params.ditModel) {
+    console.log(
+      `[Model] inferenceSteps=${steps} with turbo/missing ditModel '${params.ditModel ?? '(none)'}' → forcing '${target}'`,
+    );
+    params.ditModel = target;
+  }
+}
+
 async function getActiveModel(): Promise<string | null> {
+  // Prefer our last successful request — Gradio /v1/models often returns name "unknown"
+  if (lastRequestedDitModel) return lastRequestedDitModel;
   try {
     const res = await fetch(`${ENGINE_API}/v1/models`);
     if (!res.ok) return null;
     const data = await res.json() as any;
     const models = data?.data?.models || data?.models || [];
-    return models[0]?.name || null;
+    const name = models[0]?.name || null;
+    if (name && name !== 'unknown') return name;
+    return null;
   } catch {
     return null;
   }
 }
 
+/**
+ * Attempt to switch DiT via /v1/init when available.
+ * This Gradio build often 404s /v1/init — do NOT hard-fail; boot config_path must match.
+ */
 async function switchModelIfNeeded(ditModel: string): Promise<void> {
   const activeModel = await getActiveModel();
-  if (activeModel === ditModel) return; // already loaded, no-op
+  if (activeModel === ditModel) {
+    console.log(`[Model] Already targeting '${ditModel}' (tracked active)`);
+    return;
+  }
+
+  if (!isCheckpointOnDisk(ditModel)) {
+    const hint = `DiT checkpoint '${ditModel}' is not on disk at ${checkpointDirFor(ditModel)}. ` +
+      `Download it (e.g. python -m acestep.model_downloader --model ${ditModel} --skip-main) ` +
+      `and restart Phoenix Engine with --config_path ${ditModel}.`;
+    console.error(`[Model] ${hint}`);
+    throw new Error(hint);
+  }
 
   console.log(`[Model] Switching from '${activeModel ?? 'unknown'}' to '${ditModel}'`);
-  const res = await fetch(`${ENGINE_API}/v1/init`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: ditModel, init_llm: false }),
-  });
+  try {
+    const res = await fetch(`${ENGINE_API}/v1/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: ditModel, init_llm: false }),
+    });
 
-  if (!res.ok) {
+    if (res.ok) {
+      lastRequestedDitModel = ditModel;
+      console.log(`[Model] Switched to '${ditModel}' via /v1/init`);
+      return;
+    }
+
+    if (res.status === 404) {
+      // Gradio portable build: no runtime /v1/init. Rely on process boot --config_path.
+      lastRequestedDitModel = ditModel;
+      console.warn(
+        `[Model] /v1/init not available (404). Assuming engine was started with --config_path matching '${ditModel}'. ` +
+          `If generation still clamps steps to 8, restart Phoenix Engine with --config_path ${ditModel}.`,
+      );
+      return;
+    }
+
     const err = await res.text().catch(() => '');
     throw new Error(`Model switch to '${ditModel}' failed: ${res.status} ${err}`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('404') || /fetch failed|ECONNREFUSED/i.test(msg)) {
+      lastRequestedDitModel = ditModel;
+      console.warn(`[Model] /v1/init unreachable (${msg}); continuing with requested '${ditModel}' (boot config_path must match).`);
+      return;
+    }
+    throw e;
   }
-  console.log(`[Model] Switched to '${ditModel}'`);
 }
 
 // Discover endpoints (for compatibility)
@@ -652,6 +746,9 @@ async function processGeneration(
 ): Promise<void> {
   job.status = 'running';
   job.stage = 'Starting generation...';
+
+  // Server-side safety: turbo + steps>8 → force non-turbo DiT (engine still has its own clamp)
+  enforceNonTurboForHighSteps(params);
 
   // Guard: cover/audio2audio requires a source or audio codes
   if ((params.taskType === 'cover' || params.taskType === 'audio2audio') && !params.sourceAudioUrl && !params.audioCodes) {
