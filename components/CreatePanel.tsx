@@ -268,7 +268,6 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     const shuffled = [...MAIN_STYLES].sort(() => Math.random() - 0.5);
     setMusicTags(shuffled.slice(0, 6));
   }, []);
-
   // Mode
   const [customMode, setCustomMode] = useState(cs('customMode', true));
 
@@ -284,6 +283,128 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [instrumental, setInstrumental] = useState(cs('instrumental', false));
   const [vocalLanguage, setVocalLanguage] = useState(cs('vocalLanguage', 'en'));
   const [vocalGender, setVocalGender] = useState<'male' | 'female' | ''>(cs('vocalGender', 'male'));
+
+  const RAP_PRESET_STYLE =
+    'English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange, babyUFO style, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive';
+
+  const RAP_DELIVERY_CUES = [
+    'English UK drill RAP vocals',
+    'rhythmic rapped delivery',
+    'tight syllabic flow on-beat',
+    'aggressive spit',
+    'one syllable per beat subdivision',
+    'no singing',
+    'no humming',
+    'no melisma',
+    'no Arabic melismatic cries',
+    'no wordless vocal runs',
+  ];
+
+  const SING_DELIVERY_CUES = [
+    'melodic sung vocals',
+    'legato singing delivery',
+    'sung phrases with clear pitch',
+  ];
+
+  const ANTI_SUNG_RE =
+    /\b(no singing|no humming|no melisma|no Arabic melismatic cries|no wordless vocal runs|rhythmic rapped delivery|rapped delivery|aggressive spit|tight syllabic flow on-beat|one syllable per beat subdivision|English UK drill RAP vocals|rap vocals)\b/gi;
+
+  const looksLikeDefaultJejRapBlob = (s: string) => {
+    const t = s.trim();
+    if (!t) return true;
+    // Default / JEJ rap blob: has both drill-RAP lockouts and JEJ-depth cues
+    const hasRapLock =
+      /\bno singing\b/i.test(t) &&
+      /\brhythmic rapped delivery\b/i.test(t) &&
+      /\b(JEJ-depth|basso profondo male RAPPER)\b/i.test(t);
+    return hasRapLock && t.length > 200;
+  };
+
+  const applyDeliveryPreset = useCallback((preset: 'rap' | 'sing' | 'instrumental') => {
+    if (preset === 'instrumental') {
+      setInstrumental(true);
+      return;
+    }
+
+    setInstrumental(false);
+
+    if (preset === 'rap') {
+      setVocalGender('male');
+      setStyle((prev) => {
+        const trimmed = prev.trim();
+        if (!trimmed || looksLikeDefaultJejRapBlob(trimmed)) {
+          return RAP_PRESET_STYLE;
+        }
+        // Merge: ensure rap keyword + delivery cues without wiping custom genre tags
+        let parts = trimmed.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
+        // Drop conflicting sung cues
+        parts = parts.filter(
+          (p) =>
+            !/\b(melodic sung|legato singing|sung phrases|sung vocals|legato)\b/i.test(p)
+        );
+        const lower = new Set(parts.map((p) => p.toLowerCase()));
+        const lead: string[] = [];
+        if (![...lower].some((p) => /\b(rap|rapping|rapper|drill|trap|hip[- ]?hop)\b/i.test(p))) {
+          lead.push('uk drill RAP');
+        }
+        for (const cue of RAP_DELIVERY_CUES) {
+          if (!lower.has(cue.toLowerCase())) lead.push(cue);
+        }
+        // Prefer delivery cues at front
+        const seen = new Set<string>();
+        const ordered: string[] = [];
+        for (const p of [...lead, ...parts]) {
+          const k = p.toLowerCase();
+          if (seen.has(k)) continue;
+          seen.add(k);
+          ordered.push(p);
+        }
+        return ordered.join(', ');
+      });
+      return;
+    }
+
+    // Sing: vocal on, strip anti-sung / forced rap-delivery locks, add sung cues
+    setStyle((prev) => {
+      const trimmed = prev.trim();
+      let base = trimmed;
+      if (!trimmed || looksLikeDefaultJejRapBlob(trimmed)) {
+        // Keep deep JEJ timbre but switch to singing delivery
+        base =
+          'melodic sung vocals, legato singing delivery, sung phrases with clear pitch, deep basso profondo male voice (JEJ-depth pitch ~85-95 Hz), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male timbre, thick low harmonics, rumbling low register, babyUFO style';
+      } else {
+        // Strip forced rap/anti-sung locks; keep user's genre + timbre tags
+        base = trimmed
+          .replace(ANTI_SUNG_RE, '')
+          .replace(/,\s*,+/g, ',')
+          .replace(/^\s*,\s*|\s*,\s*$/g, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        // Soft-rewrite RAPPER → singer timbre wording when present
+        base = base
+          .replace(/\bmale RAPPER timbre\b/gi, 'male singing timbre')
+          .replace(/\bRAPPER timbre\b/gi, 'singing timbre')
+          .replace(/\brapped-pitch\b/gi, 'sung-pitch');
+      }
+      let parts = base.split(/,|\n/).map((x) => x.trim()).filter(Boolean);
+      const lower = new Set(parts.map((x) => x.toLowerCase()));
+      const lead: string[] = [];
+      for (const cue of SING_DELIVERY_CUES) {
+        if (!lower.has(cue.toLowerCase())) lead.push(cue);
+      }
+      const seen = new Set<string>();
+      const ordered: string[] = [];
+      for (const part of [...lead, ...parts]) {
+        const k = part.toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        ordered.push(part);
+      }
+      return ordered.join(', ');
+    });
+  }, []);
+
+
 
   // Music Parameters
   const [bpm, setBpm] = useState(cs('bpm', 120));
@@ -2055,6 +2176,30 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 </div>
               </div>
               <div className="px-3 pb-3 space-y-3">
+                {/* Delivery presets: Rap / Sing / Instrumental */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Presets</span>
+                  {(
+                    [
+                      { id: 'rap' as const, label: 'Rap', active: !instrumental && /\b(rap|rapping|rapper|drill)\b/i.test(style) && /\bno singing\b/i.test(style) },
+                      { id: 'sing' as const, label: 'Sing', active: !instrumental && /\b(melodic sung|legato singing|sung phrases)\b/i.test(style) },
+                      { id: 'instrumental' as const, label: 'Instrumental', active: instrumental },
+                    ]
+                  ).map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => applyDeliveryPreset(preset.id)}
+                      className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors border ${
+                        preset.active
+                          ? 'bg-pink-600 text-white border-pink-500'
+                          : 'bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-zinc-200 dark:border-white/5'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
                 {/* Quick Tags */}
                 <div className="flex flex-wrap gap-2">
                   {musicTags.map(tag => (

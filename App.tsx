@@ -146,6 +146,8 @@ function AppContent() {
   const SIDEBAR_WIDTH_KEY = 'phoenix-sidebar-width';
   const SIDEBAR_MIN_WIDTH = 160;
   const SIDEBAR_MAX_WIDTH = 320;
+  /** Drag below this raw width snaps to icon-only (72px) mode */
+  const SIDEBAR_SNAP_THRESHOLD = 110;
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
       const stored = localStorage.getItem(SIDEBAR_WIDTH_KEY);
@@ -158,6 +160,8 @@ function AppContent() {
   });
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const shellLayoutRef = useRef<HTMLDivElement>(null);
+  const showLeftSidebarRef = useRef(showLeftSidebar);
+  showLeftSidebarRef.current = showLeftSidebar;
 
   const clampSidebarWidth = useCallback((width: number) => {
     return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, Math.round(width)));
@@ -168,19 +172,61 @@ function AppContent() {
     setIsResizingSidebar(true);
   }, []);
 
+  const handleLeftSidebarToggle = useCallback(() => {
+    setShowLeftSidebar((open) => {
+      if (!open) {
+        // Expanding from icons — restore last expanded width from localStorage
+        try {
+          const stored = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+          if (stored) {
+            const n = parseInt(stored, 10);
+            if (!Number.isNaN(n) && n >= SIDEBAR_MIN_WIDTH && n <= SIDEBAR_MAX_WIDTH) {
+              setSidebarWidth(n);
+            }
+          }
+        } catch { /* ignore */ }
+        return true;
+      }
+      return false;
+    });
+  }, []);
+
   useEffect(() => {
     if (!isResizingSidebar) return;
+
+    const clearResizeCursor = () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!shellLayoutRef.current) return;
       const rect = shellLayoutRef.current.getBoundingClientRect();
-      setSidebarWidth(clampSidebarWidth(e.clientX - rect.left));
+      const raw = Math.round(e.clientX - rect.left);
+
+      // Collapsed: first outward drag past snap threshold expands + grows width
+      if (!showLeftSidebarRef.current) {
+        if (raw >= SIDEBAR_SNAP_THRESHOLD) {
+          setShowLeftSidebar(true);
+          setSidebarWidth(clampSidebarWidth(raw));
+        }
+        return;
+      }
+
+      // Expanded: drag below snap threshold → icon-only, stop resize (keep last expanded width)
+      if (raw < SIDEBAR_SNAP_THRESHOLD) {
+        setShowLeftSidebar(false);
+        setIsResizingSidebar(false);
+        clearResizeCursor();
+        return;
+      }
+
+      setSidebarWidth(clampSidebarWidth(raw));
     };
 
     const handleMouseUp = () => {
       setIsResizingSidebar(false);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      clearResizeCursor();
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -191,17 +237,17 @@ function AppContent() {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      clearResizeCursor();
     };
   }, [isResizingSidebar, clampSidebarWidth]);
 
   useEffect(() => {
-    if (isResizingSidebar) return;
+    // Only persist expanded widths — never overwrite with collapsed/snap state
+    if (isResizingSidebar || !showLeftSidebar) return;
     try {
       localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
     } catch { /* ignore */ }
-  }, [sidebarWidth, isResizingSidebar]);
+  }, [sidebarWidth, isResizingSidebar, showLeftSidebar]);
 
   // Mobile UI Toggle
   const [mobileShowList, setMobileShowList] = useState(false);
@@ -1562,27 +1608,25 @@ function AppContent() {
           onLogout={logout}
           onOpenSettings={() => setShowSettingsModal(true)}
           isOpen={showLeftSidebar}
-          onToggle={() => setShowLeftSidebar(!showLeftSidebar)}
+          onToggle={handleLeftSidebarToggle}
           width={sidebarWidth}
           isResizing={isResizingSidebar}
         />
 
-        {/* Left nav divider — muted zinc pill only (md+; sidebar overlay on mobile) */}
-        {showLeftSidebar && (
+        {/* Left nav divider - muted zinc pill only (md+; always present so collapsed can drag-expand) */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          onMouseDown={handleSidebarResizeStart}
+          className="hidden md:flex flex-shrink-0 w-2.5 h-full cursor-col-resize z-20 items-center justify-center bg-transparent"
+        >
           <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize sidebar"
-            onMouseDown={handleSidebarResizeStart}
-            className="hidden md:flex flex-shrink-0 w-2.5 h-full cursor-col-resize z-20 items-center justify-center bg-transparent"
-          >
-            <div
-              className={`w-1 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 transition-colors ${
-                isResizingSidebar ? 'bg-zinc-400 dark:bg-zinc-500' : 'hover:bg-zinc-400 dark:hover:bg-zinc-500'
-              }`}
-            />
-          </div>
-        )}
+            className={`w-1 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 transition-colors ${
+              isResizingSidebar ? 'bg-zinc-400 dark:bg-zinc-500' : 'hover:bg-zinc-400 dark:hover:bg-zinc-500'
+            }`}
+          />
+        </div>
 
         <main className="flex-1 flex overflow-hidden relative">
           {renderContent()}
