@@ -112,7 +112,7 @@ router.get('/:id/audio', optionalAuthMiddleware, async (req: AuthenticatedReques
 });
 
 
-// Download / export via ffmpeg (wav/mp3/flac/ogg)
+// Download / export via ffmpeg (wav/mp3/flac/ogg/aac)
 router.get('/:id/download', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   let tmpPath: string | null = null;
   try {

@@ -1,4 +1,4 @@
-export type DownloadFormat = 'original' | 'wav' | 'mp3' | 'flac' | 'ogg';
+export type DownloadFormat = 'original' | 'wav' | 'mp3' | 'flac' | 'ogg' | 'aac';
 
 export const DOWNLOAD_FORMATS: { id: DownloadFormat; label: string }[] = [
   { id: 'original', label: 'Original' },
@@ -6,6 +6,7 @@ export const DOWNLOAD_FORMATS: { id: DownloadFormat; label: string }[] = [
   { id: 'mp3', label: 'MP3 (ffmpeg)' },
   { id: 'flac', label: 'FLAC (ffmpeg)' },
   { id: 'ogg', label: 'OGG (ffmpeg)' },
+  { id: 'aac', label: 'AAC (ffmpeg)' },
 ];
 
 function extFromAudioUrl(url: string, blobType?: string): string {
@@ -14,6 +15,7 @@ function extFromAudioUrl(url: string, blobType?: string): string {
   if (path.endsWith('.wav')) return 'wav';
   if (path.endsWith('.ogg')) return 'ogg';
   if (path.endsWith('.m4a')) return 'm4a';
+  if (path.endsWith('.aac')) return 'aac';
   if (path.endsWith('.mp3')) return 'mp3';
   if (blobType?.includes('flac')) return 'flac';
   if (blobType?.includes('wav')) return 'wav';

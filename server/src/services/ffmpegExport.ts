@@ -7,14 +7,15 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const LOCAL_AUDIO_DIR = path.join(__dirname, '../../public/audio');
 
-export type ExportFormat = 'wav' | 'mp3' | 'flac' | 'ogg';
-export const EXPORT_FORMATS: ExportFormat[] = ['wav', 'mp3', 'flac', 'ogg'];
+export type ExportFormat = 'wav' | 'mp3' | 'flac' | 'ogg' | 'aac';
+export const EXPORT_FORMATS: ExportFormat[] = ['wav', 'mp3', 'flac', 'ogg', 'aac'];
 
 const CONTENT_TYPES: Record<ExportFormat, string> = {
   wav: 'audio/wav',
   mp3: 'audio/mpeg',
   flac: 'audio/flac',
   ogg: 'audio/ogg',
+  aac: 'audio/aac',
 };
 
 export function isExportFormat(v: string): v is ExportFormat {
@@ -53,6 +54,8 @@ function ffmpegArgs(input: string, output: string, format: ExportFormat): string
       return [...base, '-acodec', 'flac', output];
     case 'ogg':
       return [...base, '-codec:a', 'libvorbis', '-q:a', '6', output];
+    case 'aac':
+      return [...base, '-c:a', 'aac', '-b:a', '192k', '-f', 'adts', output];
   }
 }
 

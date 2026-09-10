@@ -347,7 +347,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                 className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                                 title={t('downloadAudio')}
                                 onClick={async () => {
-                                    const pick = window.prompt('Download format: original / wav / mp3 / flac / ogg', 'wav');
+                                    const pick = window.prompt('Download format: original / wav / mp3 / flac / ogg / aac', 'wav');
                                     if (!pick) return;
                                     const format = pick.trim().toLowerCase() as DownloadFormat;
                                     try {
@@ -355,7 +355,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                             audioUrl: song.audioUrl,
                                             title: song.title,
                                             songId: song.id,
-                                            format: (['original','wav','mp3','flac','ogg'].includes(format) ? format : 'wav') as DownloadFormat,
+                                            format: (['original','wav','mp3','flac','ogg','aac'].includes(format) ? format : 'wav') as DownloadFormat,
                                         });
                                     } catch (error) {
                                         console.error('Download failed:', error);

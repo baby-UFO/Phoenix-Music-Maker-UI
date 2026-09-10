@@ -137,10 +137,10 @@ export const Player: React.FC<PlayerProps> = ({
 
         const handleDownload = async () => {
         if (!currentSong?.audioUrl && !currentSong?.id) return;
-        const pick = window.prompt('Download format: original / wav / mp3 / flac / ogg', 'wav');
+        const pick = window.prompt('Download format: original / wav / mp3 / flac / ogg / aac', 'wav');
         if (!pick) return;
         const raw = pick.trim().toLowerCase();
-        const format = (['original', 'wav', 'mp3', 'flac', 'ogg'].includes(raw) ? raw : 'wav') as DownloadFormat;
+        const format = (['original', 'wav', 'mp3', 'flac', 'ogg', 'aac'].includes(raw) ? raw : 'wav') as DownloadFormat;
         try {
             await downloadSongAudio({
                 audioUrl: currentSong.audioUrl,
