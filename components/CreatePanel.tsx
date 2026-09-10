@@ -194,7 +194,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     randomSeed: true,
     seed: -1,
     thinking: false,
-    enhance: false,
+    enhance: true,
     audioFormat: 'flac',
     inferenceSteps: 200,
     inferMethod: 'sde',
@@ -234,6 +234,14 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       const raw = lsGet(CREATE_SETTINGS_KEY, CREATE_SETTINGS_LEGACY);
       if (!raw) return { ...BUILTIN_CREATE_DEFAULTS };
       const parsed = { ...BUILTIN_CREATE_DEFAULTS, ...JSON.parse(raw) } as CreateSettings;
+      // One-shot: Style of Music Enhance ON by default (persists user choice after)
+      try {
+        const mig = 'phoenix-enhance-default-on-v1';
+        if (!localStorage.getItem(mig)) {
+          parsed.enhance = true;
+          localStorage.setItem(mig, '1');
+        }
+      } catch { /* ignore */ }
       // Always prefer the v2 style adapter if saved path is missing/old
       const bad = !parsed.loraPath || /lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v3b/.test(parsed.loraPath);
       if (bad) parsed.loraPath = 'E:\\ACE-Step-1.5\\lora_output_v3b\\final\\adapter';
@@ -297,7 +305,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [randomSeed, setRandomSeed] = useState(cs('randomSeed', true));
   const [seed, setSeed] = useState(cs('seed', -1));
   const [thinking, setThinking] = useState(cs('thinking', false)); // BPM path may still force Think server-side
-  const [enhance, setEnhance] = useState(cs('enhance', false));
+  const [enhance, setEnhance] = useState(cs('enhance', true));
   const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>(cs('audioFormat', 'flac'));
   const [inferenceSteps, setInferenceSteps] = useState(cs('inferenceSteps', 200));
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(cs('inferMethod', 'sde'));
@@ -1220,7 +1228,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           const stamp = `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
           const base = title.trim()
             || (styleWithGender.trim().split(/\s+/).slice(0, 4).join(' ') || 'Track');
-          const named = title.trim() ? base : `${base} · ${stamp}`;
+          const named = title.trim() ? base : `${base} Â· ${stamp}`;
           return bulkCount > 1 ? `${named} (${i + 1})` : named;
         })(),
         ditModel: selectedModel,
@@ -1415,7 +1423,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                             </span>
                             {fetchedModels.find(m => m.name === model.id)?.is_preloaded && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                {fetchedModels.find(m => m.name === model.id)?.is_active ? '● Active' : '● Ready'}
+                                {fetchedModels.find(m => m.name === model.id)?.is_active ? 'â— Active' : 'â— Ready'}
                               </span>
                             )}
                           </div>
@@ -2427,7 +2435,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 <button
                   type="button"
                   onClick={() => {
-                    // Convert source audio to LM codes — requires Gradio lambda (not exposed as API)
+                    // Convert source audio to LM codes â€” requires Gradio lambda (not exposed as API)
                     // This is a placeholder: Gradio's convert_src_audio_to_codes_wrapper is not a named endpoint
                     console.log('Convert to Codes: requires source audio upload. Use Gradio UI for this feature.');
                   }}
@@ -2440,7 +2448,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 <button
                   type="button"
                   onClick={() => {
-                    // Transcribe audio codes to metadata — requires Gradio lambda (not exposed as API)
+                    // Transcribe audio codes to metadata â€” requires Gradio lambda (not exposed as API)
                     console.log('Transcribe: requires audio codes. Use Gradio UI for this feature.');
                   }}
                   disabled={!audioCodes.trim()}
