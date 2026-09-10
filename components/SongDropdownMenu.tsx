@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Song } from '../types';
 import { useI18n } from '../context/I18nContext';
+import { downloadSongAudio, DOWNLOAD_FORMATS, type DownloadFormat } from '../utils/downloadAudio';
 import {
     Video,
     Edit3,
@@ -134,25 +135,18 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
         onClose();
     };
 
-    const handleDownload = async () => {
-        if (!song.audioUrl) return;
+        const handleDownload = async (format: DownloadFormat = 'original') => {
+        if (!song.audioUrl && !song.id) return;
         try {
-            // Fetch as blob to handle cross-origin
-            const response = await fetch(song.audioUrl);
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${song.title || 'song'}.mp3`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            // Clean up blob URL
-            URL.revokeObjectURL(url);
+            await downloadSongAudio({
+                audioUrl: song.audioUrl,
+                title: song.title,
+                songId: song.id,
+                format,
+            });
         } catch (error) {
             console.error('Download failed:', error);
+            alert(error instanceof Error ? error.message : 'Download failed');
         }
         onClose();
     };
@@ -223,11 +217,14 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
                 label={t('addToPlaylist')}
                 onClick={() => handleAction(onAddToPlaylist)}
             />
-            <MenuItem
-                icon={<Download size={14} />}
-                label={t('download')}
-                onClick={onDownload ? () => handleAction(onDownload) : handleDownload}
-            />
+            {DOWNLOAD_FORMATS.map((f) => (
+                <MenuItem
+                    key={f.id}
+                    icon={<Download size={14} />}
+                    label={`${t('download')} - ${f.label}`}
+                    onClick={() => (onDownload && f.id === 'original' ? handleAction(onDownload) : handleDownload(f.id))}
+                />
+            ))}
             <MenuItem
                 icon={<Share2 size={14} />}
                 label={t('share')}

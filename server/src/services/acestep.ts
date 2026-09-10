@@ -131,47 +131,132 @@ async function prepareAudioFile(audioUrl: string | undefined): Promise<unknown> 
  * Build the 50 positional arguments for the Gradio /generation_wrapper endpoint.
  */
 async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
+  // Pass the user's BPM through unchanged. No doubling, no "felt tempo" caption hacks.
+  const userBpm = params.bpm && params.bpm > 0 ? Math.round(params.bpm) : 0;
   const caption = params.style || 'pop music';
-  const prompt = params.customMode ? caption : (params.songDescription || caption);
+
+  let prompt = params.customMode ? caption : (params.songDescription || caption);
   const lyrics = params.instrumental ? '' : (params.lyrics || '');
-  const isThinking = params.thinking ?? false;
+
+  // Voice descriptions get buried after genre tags and then ignored. Lead with them.
+  // Also strip stacked bare "Male vocals" lines from the UI gender toggle.
+  const promoteVocals = (text: string): string => {
+    if (!text) return text;
+    const parts = text.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
+    const vocalRe = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered)\b/i;
+    const vocal = parts.filter((p) => vocalRe.test(p));
+    const other = parts.filter((p) => !vocalRe.test(p));
+    const rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
+    const useVocal = rich.length ? rich : vocal;
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const p of [...useVocal, ...other]) {
+      const k = p.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(p);
+    }
+    return out.join(', ');
+  };
+  prompt = promoteVocals(prompt);
+
+  // Force James Earl Jones-depth wording when user asked for deep male / baritone / basso
+  const wantsJeJDepth = /\b(baritone|basso|profondo|james earl jones|chest voice|low male|deep male|oratorical)\b/i.test(prompt);
+  if (wantsJeJDepth && !/james earl jones/i.test(prompt)) {
+    prompt = `James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature oratorical delivery, rumbling low register, no tenor (~170 Hz+), ${prompt}`;
+  }
+
+
+  // Lock dialed tempo in the caption (exact BPM, never doubled). Keeps vocal lead, then tempo.
+  if (userBpm > 0) {
+    const tempoLock = `${userBpm} BPM, 4/4, kick on every beat, snare on 2 and 4, not half-time, not ${Math.round(userBpm / 2)} BPM`;
+    if (!new RegExp(`^${userBpm}\\s*BPM\\b`, 'i').test(prompt)) {
+      prompt = `${tempoLock}, ${prompt}`;
+    }
+  }
+
+
+
+  // Think + CoT metas lets constrained decoding lock the BPM field the engine already supports
+  const isThinking = userBpm > 0 ? true : (params.thinking ?? false);
   const isEnhance = params.enhance ?? false;
 
-  // Prepare audio files (async — reads from disk)
-  const referenceAudio = await prepareAudioFile(params.referenceAudioUrl);
-  const sourceAudio = await prepareAudioFile(params.sourceAudioUrl);
+  const taskType = (params.taskType === 'audio2audio' ? 'cover' : params.taskType) || 'text2music';
+  const needsSource = taskType === 'cover' || taskType === 'repaint';
 
-  // Guard: cover/repaint modes require source audio to be loadable
-  const needsSource = params.taskType === 'cover' || params.taskType === 'audio2audio' || params.taskType === 'repaint';
+  const referenceAudio = await prepareAudioFile(params.referenceAudioUrl);
+  const sourceAudio = needsSource
+    ? await prepareAudioFile(params.sourceAudioUrl)
+    : null;
+
   if (needsSource && params.sourceAudioUrl && sourceAudio === null) {
     throw new Error(`Source audio file could not be loaded from: ${params.sourceAudioUrl}. Make sure the file was uploaded successfully.`);
   }
 
-  // CoT features are gated by enhance OR thinking (either enables LLM enrichment)
-  const useCot = isEnhance || isThinking;
+  const wantCotMetas = userBpm > 0 ? true : (isEnhance || isThinking) ? (params.useCotMetas ?? true) : false;
+  // Don't rewrite the user's caption when BPM is set — that was scrambling tempo cues
+  const wantCotCaption = userBpm > 0 ? false : (isEnhance || isThinking) ? (params.useCotCaption ?? true) : false;
+  const wantCotLanguage = (isEnhance || isThinking) ? (params.useCotLanguage ?? true) : false;
+
+  let lmNegative = params.lmNegativePrompt || 'NO USER INPUT';
+  const wantsDeepMale = /\b(baritone|basso|profondo|chest voice|low male|deep male|deep basso)\b/i.test(prompt);
+  if (wantsDeepMale) {
+    const antiHigh = 'Justin Bieber-like light pop male vocals, youthful teen tenor (~170-185 Hz), thin nasal voice, breathy pop crooner, falsetto, high pitched male vocals, chipmunk vocals, female vocals, soprano, child vocals, fake baritone, light pop baritone ~130-150 Hz, tenor drift above ~110 Hz, forced low voice without chest resonance';
+    if (!lmNegative || lmNegative === 'NO USER INPUT') lmNegative = antiHigh;
+    else if (!/falsetto|tenor|high pitched/i.test(lmNegative)) lmNegative = `${lmNegative}, ${antiHigh}`;
+  }
+  if (userBpm > 0) {
+    const antiHalf = `half-time feel, slow ${Math.round(userBpm / 2)} BPM groove, lethargic ballad pacing, dragging tempo`;
+    if (!lmNegative || lmNegative === 'NO USER INPUT') lmNegative = antiHalf;
+    else if (!/half-time feel|dragging tempo/i.test(lmNegative)) lmNegative = `${lmNegative}, ${antiHalf}`;
+  }
+
+
+  try {
+    const fs = await import('fs');
+    fs.appendFileSync(
+      'E:/ace-step/server/bpm-debug.log',
+      JSON.stringify({
+        t: new Date().toISOString(),
+        userBpm,
+        engineBpm: userBpm,
+        isThinking,
+        wantCotMetas,
+        wantCotCaption,
+        promptStart: String(prompt).slice(0, 260),
+        tempoLocked: userBpm > 0,
+        wantsDeepMale: /\b(baritone|basso|profondo|chest voice|low male|deep male)\b/i.test(String(prompt)),
+        lmNegativeStart: String(lmNegative).slice(0, 120),
+      }) + '\n',
+    );
+  } catch {
+    // ignore
+  }
+
+  console.log('[buildGradioArgs] bpm=', userBpm, 'thinking=', isThinking);
 
   return [
     prompt,                                                       //  0: Music Caption
     lyrics,                                                       //  1: Lyrics
-    params.bpm && params.bpm > 0 ? params.bpm : 0,               //  2: BPM (0 = auto)
-    params.keyScale || '',                                        //  3: KeyScale
-    params.timeSignature || '',                                   //  4: Time Signature
+    userBpm,                                                      //  2: BPM (exact user value)
+    params.keyScale || '',                                        //  3: Key
+    (userBpm > 0 ? (params.timeSignature || '4/4') : (params.timeSignature || '')), //  4: Time Signature
     params.vocalLanguage || 'en',                                 //  5: Vocal Language
     params.inferenceSteps ?? 8,                                   //  6: DiT Inference Steps
     params.guidanceScale ?? 7.0,                                  //  7: DiT Guidance Scale
     params.randomSeed !== false,                                  //  8: Random Seed
     String(params.seed ?? -1),                                    //  9: Seed
-    referenceAudio,                                               // 10: Reference Audio (filepath | null)
-    params.duration && params.duration > 0 ? params.duration : -1, // 11: Audio Duration (-1 = auto)
-    Math.min(Math.max(params.batchSize ?? 1, 1), 16),            // 12: Batch Size (clamped 1-16)
-    sourceAudio,                                                  // 13: Source Audio (filepath | null)
+    referenceAudio,                                               // 10: Reference Audio
+    params.duration && params.duration > 0 ? params.duration : -1, // 11: Audio Duration
+    Math.min(Math.max(params.batchSize ?? 1, 1), 16),            // 12: Batch Size
+    sourceAudio,                                                  // 13: Source Audio
     params.audioCodes || '',                                      // 14: LM Codes Hints
     params.repaintingStart ?? 0.0,                                // 15: Repainting Start
     params.repaintingEnd ?? -1,                                   // 16: Repainting End
     params.instruction || 'Fill the audio semantic mask with the style described in the text prompt.', // 17: Instruction
-    params.audioCoverStrength ?? 1.0,                             // 18: Audio Cover Strength
-    0.0,                                                          // 19: Cover Noise Strength (ACE-Step v1.5 new param, default 0.0)
-    (params.taskType === 'audio2audio' ? 'cover' : params.taskType) || 'text2music', // 20: Task Type
+    params.audioCoverStrength ?? 1.0,                             // 18: Audio Cover / LM Codes Strength
+    params.coverNoiseStrength ?? 0.0,                             // 19: Cover Noise Strength
+    taskType,                                                     // 20: task_type
     params.useAdg ?? false,                                       // 21: Use ADG
     params.cfgIntervalStart ?? 0.0,                               // 22: CFG Interval Start
     params.cfgIntervalEnd ?? 1.0,                                 // 23: CFG Interval End
@@ -181,29 +266,26 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     params.audioFormat || 'mp3',                                  // 27: Audio Format
     params.lmTemperature ?? 0.85,                                 // 28: LM Temperature
     isThinking,                                                   // 29: Think
-    params.lmCfgScale ?? 2.0,                                    // 30: LM CFG Scale
+    params.lmCfgScale ?? 2.0,                                     // 30: LM CFG Scale
     params.lmTopK ?? 0,                                           // 31: LM Top-K
     params.lmTopP ?? 0.9,                                         // 32: LM Top-P
-    params.lmNegativePrompt || 'NO USER INPUT',                   // 33: LM Negative Prompt
-    useCot ? (params.useCotMetas ?? true) : false,                // 34: CoT Metas
-    useCot ? (params.useCotCaption ?? true) : false,              // 35: CaptionRewrite
-    useCot ? (params.useCotLanguage ?? true) : false,             // 36: CoT Language
-    params.isFormatCaption ?? false,                              // 37: Is Format Caption State
-    params.constrainedDecodingDebug ?? false,                     // 38: Constrained Decoding Debug
-    params.allowLmBatch ?? true,                                  // 39: ParallelThinking
-    params.getScores ?? false,                                    // 40: Auto Score
-    params.getLrc ?? false,                                       // 41: Auto LRC (timestamped lyrics)
-    params.scoreScale ?? 0.5,                                     // 42: Quality Score Sensitivity (0.01-1.0)
-    params.lmBatchChunkSize ?? 8,                                 // 43: LM Batch Chunk Size
-    params.trackName || null,                                     // 44: Track Name
-    params.completeTrackClasses || [],                            // 45: Track Names
-    true,                                                         // 46: Enable Normalization (ACE-Step v1.5, default true)
-    -1.0,                                                         // 47: Normalization DB (ACE-Step v1.5, default -1.0)
-    0.0,                                                          // 48: Latent Shift (ACE-Step v1.5, default 0.0)
-    1.0,                                                          // 49: Latent Rescale (ACE-Step v1.5, default 1.0)
-    params.autogen ?? false,                                      // 50: AutoGen
-    // Note: current_batch_index, total_batches, batch_queue, generation_params_state
-    // are hidden Gradio state variables and must NOT be passed via client.predict()
+    lmNegative,                                                   // 33: LM Negative Prompt
+    wantCotMetas,                                                 // 34: CoT Metas
+    wantCotCaption,                                               // 35: CaptionRewrite
+    wantCotLanguage,                                              // 36: CoT Language
+    params.constrainedDecodingDebug ?? false,                     // 37: Constrained Decoding Debug
+    params.allowLmBatch ?? true,                                  // 38: ParallelThinking
+    params.getScores ?? false,                                    // 39: Auto Score
+    params.getLrc ?? false,                                       // 40: Auto LRC
+    params.scoreScale ?? 0.5,                                     // 41: Quality Score Sensitivity
+    params.lmBatchChunkSize ?? 8,                                 // 42: LM Batch Chunk Size
+    params.trackName || null,                                     // 43: Track Name
+    params.completeTrackClasses || [],                            // 44: Track Names
+    true,                                                         // 45: Enable Normalization
+    -1.0,                                                         // 46: Target Peak (dB)
+    0.0,                                                          // 47: Latent Shift
+    1.0,                                                          // 48: Latent Rescale
+    params.autogen ?? false,                                      // 49: AutoGen
   ];
 }
 
@@ -301,6 +383,7 @@ export interface GenerationParams {
   repaintingEnd?: number;
   instruction?: string;
   audioCoverStrength?: number;
+  coverNoiseStrength?: number;
   taskType?: string;
   useAdg?: boolean;
   cfgIntervalStart?: number;
@@ -525,7 +608,9 @@ async function processGenerationViaGradio(
   const prompt = params.customMode ? caption : (params.songDescription || caption);
 
   console.log(`Job ${jobId}: Using Gradio /generation_wrapper`, {
-    prompt: prompt.slice(0, 50),
+    bpm: params.bpm,
+    thinkingForced: !!(params.bpm && params.bpm > 0),
+    prompt: (args[0] as string)?.slice?.(0, 80) ?? prompt.slice(0, 50),
     duration: params.duration,
     batchSize: params.batchSize,
   });

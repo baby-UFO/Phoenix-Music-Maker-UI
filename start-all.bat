@@ -44,7 +44,7 @@ REM Detect ACE-Step installation type
 set API_COMMAND=
 if exist "%ACESTEP_PATH%\python_embeded\python.exe" (
     echo [+] Detected Windows Portable Package
-    set API_COMMAND=python_embeded\python acestep\api_server.py
+    set API_COMMAND=python_embeded\python acestep\acestep_v15_pipeline.py --port 8001 --server-name 127.0.0.1 --enable-api --backend pt --init_service true
 ) else (
     echo [+] Detected Standard Installation
     set API_COMMAND=uv run acestep-api --port 8001
@@ -110,3 +110,4 @@ start http://localhost:3000
 echo.
 echo Press any key to close this window (services will keep running)
 pause >nul
+

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { trainingApi, getTrainingAudioUrl, TrainingSample, DatasetSettings } from '../services/api';
+import { authApi, trainingApi, getTrainingAudioUrl, TrainingSample, DatasetSettings } from '../services/api';
 
 type TrainingTab = 'dataset' | 'train' | 'export';
 
@@ -77,6 +77,7 @@ export const TrainingPanel: React.FC = () => {
   const [uploadDatasetName, setUploadDatasetName] = useState('my_lora_dataset');
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [savedFiles, setSavedFiles] = useState<Array<{ filename: string; path: string; size?: number }>>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -299,18 +300,29 @@ export const TrainingPanel: React.FC = () => {
 
   // === Upload + Build Dataset ===
   const handleUploadAndBuild = useCallback(async () => {
-    if (!token || queuedFiles.length === 0) return;
+    if (queuedFiles.length === 0) {
+      setUploadStatus('Pick at least one audio file first.');
+      return;
+    }
     setUploading(true);
-    setUploadStatus('Uploading files...');
+    setUploadStatus(`Sending ${queuedFiles.length} file(s) to 147.81.62.51...`);
     try {
-      await trainingApi.uploadAudio(queuedFiles, uploadDatasetName, token);
-      setUploadStatus(`Uploaded ${queuedFiles.length} files. Building dataset...`);
+      let authToken = token;
+      if (!authToken) {
+        const auto = await authApi.auto();
+        authToken = auto.token;
+      }
+      const uploaded = await trainingApi.uploadAudio(queuedFiles, uploadDatasetName, authToken, (pct) => {
+        setUploadStatus(`Uploading... ${pct}%`);
+      });
+      setSavedFiles(uploaded.files || []);
+      setUploadStatus(`Wrote ${uploaded.count} file(s) to disk. Creating dataset...`);
       const result = await trainingApi.buildDataset({
         datasetName: uploadDatasetName,
         customTag: datasetSettings.customTag,
         tagPosition: datasetSettings.tagPosition,
         allInstrumental: datasetSettings.allInstrumental,
-      }, token);
+      }, authToken);
       setDatasetLoaded(true);
       setSampleCount(result.sampleCount);
       setCurrentSampleIdx(0);
@@ -323,10 +335,11 @@ export const TrainingPanel: React.FC = () => {
       const dp = result.datasetPath || `./datasets/${uploadDatasetName}.json`;
       setDatasetPath(dp);
       setSavePath(dp);
-      setDatasetStatus(result.status as string);
+      setDatasetStatus(String(result.status || ''));
       setQueuedFiles([]);
       markStep('upload');
-      setUploadStatus('');
+      const names = (uploaded.files || []).map(f => f.filename).join(', ');
+      setUploadStatus(`Saved ${uploaded.count} file(s): ${names}. Dataset: ${dp}`);
     } catch (error) {
       setUploadStatus(`Error: ${error instanceof Error ? error.message : 'Upload failed'}`);
     } finally {
@@ -768,8 +781,8 @@ export const TrainingPanel: React.FC = () => {
               >
                 <Upload size={24} className={`mx-auto mb-2 ${isDragOver ? 'text-pink-400' : 'text-zinc-500'}`} />
                 <p className="text-xs text-zinc-400">Drop audio files here or click to browse</p>
-                <p className="text-[10px] text-zinc-600 mt-1">.wav, .mp3, .flac, .ogg, .opus</p>
-                <input ref={fileInputRef} type="file" multiple accept=".wav,.mp3,.flac,.ogg,.opus" onChange={handleFileSelect} className="hidden" />
+                <p className="text-[10px] text-zinc-600 mt-1">.wav, .mp3, .flac, .ogg, .opus, .m4a</p>
+                <input ref={fileInputRef} type="file" multiple accept=".wav,.mp3,.flac,.ogg,.opus,.m4a,.aac,.aiff,.webm" onClick={(e) => e.stopPropagation()} onChange={handleFileSelect} className="hidden" />
               </div>
               {queuedFiles.length > 0 && (
                 <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
@@ -778,7 +791,7 @@ export const TrainingPanel: React.FC = () => {
                       <FileAudio size={12} className="text-zinc-400 flex-shrink-0" />
                       <span className="text-[11px] text-zinc-300 truncate flex-1">{f.name}</span>
                       <span className="text-[10px] text-zinc-500">{(f.size / 1024 / 1024).toFixed(1)}MB</span>
-                      <button onClick={() => removeQueuedFile(i)} className="text-zinc-500 hover:text-red-400"><X size={12} /></button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); removeQueuedFile(i); }} className="text-zinc-500 hover:text-red-400"><X size={12} /></button>
                     </div>
                   ))}
                 </div>
@@ -788,13 +801,20 @@ export const TrainingPanel: React.FC = () => {
                   <FieldRow label={t('datasetName')}>
                     <input type="text" value={uploadDatasetName} onChange={e => setUploadDatasetName(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" placeholder="my_lora_dataset" />
                   </FieldRow>
-                  <button onClick={handleUploadAndBuild} disabled={uploading || !uploadDatasetName.trim()} className="w-full py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+                  <button type="button" onClick={handleUploadAndBuild} disabled={uploading || !uploadDatasetName.trim()} className="w-full py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-2 disabled:opacity-50">
                     {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                     Upload & Create Dataset ({queuedFiles.length} files)
                   </button>
                 </div>
               )}
-              {uploadStatus && <p className="text-xs text-zinc-400 mt-1.5 break-words">{uploadStatus}</p>}
+              {uploadStatus && <p className={`text-xs mt-1.5 break-words ${uploadStatus.startsWith('Error') ? 'text-red-400' : 'text-emerald-300'}`}>{uploadStatus}</p>}
+              {savedFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {savedFiles.map((f) => (
+                    <p key={f.path || f.filename} className="text-[10px] text-zinc-400 truncate">{f.filename}</p>
+                  ))}
+                </div>
+              )}
             </Section>
 
             {/* Scan Directory */}

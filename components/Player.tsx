@@ -7,6 +7,7 @@ import { useI18n } from '../context/I18nContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
 import { AlbumCover } from './AlbumCover';
+import { downloadSongAudio, type DownloadFormat } from '../utils/downloadAudio';
 
 interface PlayerProps {
     currentSong: Song | null;
@@ -63,7 +64,7 @@ export const Player: React.FC<PlayerProps> = ({
     onDelete,
     onPlayFirst
 }) => {
-    const { user } = useAuth();
+    const { user, token } = useAuth();
     const { isMobile } = useResponsive();
     const { t } = useI18n();
     const progressBarRef = useRef<HTMLDivElement>(null);
@@ -134,21 +135,23 @@ export const Player: React.FC<PlayerProps> = ({
 
     const progressPercent = duration ? (currentTime / duration) * 100 : 0;
 
-    const handleDownload = async () => {
-        if (!currentSong?.audioUrl) return;
+        const handleDownload = async () => {
+        if (!currentSong?.audioUrl && !currentSong?.id) return;
+        const pick = window.prompt('Download format: original / wav / mp3 / flac / ogg', 'wav');
+        if (!pick) return;
+        const raw = pick.trim().toLowerCase();
+        const format = (['original', 'wav', 'mp3', 'flac', 'ogg'].includes(raw) ? raw : 'wav') as DownloadFormat;
         try {
-            const response = await fetch(currentSong.audioUrl);
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${currentSong.title || 'song'}.mp3`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            await downloadSongAudio({
+                audioUrl: currentSong.audioUrl,
+                title: currentSong.title,
+                songId: currentSong.id,
+                format,
+                token,
+            });
         } catch (error) {
             console.error('Download failed:', error);
+            alert(error instanceof Error ? error.message : 'Download failed');
         }
     };
 

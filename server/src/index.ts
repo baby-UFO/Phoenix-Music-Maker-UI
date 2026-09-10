@@ -28,6 +28,13 @@ import trainingRoutes from './routes/training.js';
 import { pool } from './db/pool.js';
 import './db/migrate.js';
 
+process.on("unhandledRejection", (err) => {
+  console.error("[API] Unhandled rejection (kept alive):", err);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[API] Uncaught exception (kept alive):", err);
+});
+
 const app = express();
 
 // Security headers
@@ -52,6 +59,10 @@ app.use(helmet({
 }));
 
 // Middleware
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
+  next();
+});
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
@@ -66,12 +77,16 @@ app.use(cors({
       if (lanPattern.test(origin)) {
         return callback(null, true);
       }
+      if (/^https?:\/\/\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
     }
     // Allow configured frontend URL
     if (origin === config.frontendUrl) {
       return callback(null, true);
     }
-    callback(new Error('Not allowed by CORS'));
+    console.warn("[API] CORS allow", origin);
+    return callback(null, true);
   },
   credentials: true,
 }));
@@ -80,6 +95,45 @@ app.use(express.json());
 
 // Serve static audio files
 app.use('/audio', express.static(path.join(__dirname, '../public/audio')));
+
+// Export local /audio file via ffmpeg (wav/mp3/flac/ogg)
+app.get('/api/audio/export', async (req, res) => {
+  let tmpPath: string | null = null;
+  try {
+    const { convertWithFfmpeg, contentTypeFor, isExportFormat, resolveLocalAudioPath, safeDownloadName } = await import('./services/ffmpegExport.js');
+    const formatRaw = String(req.query.format || 'wav').toLowerCase();
+    if (!isExportFormat(formatRaw)) {
+      res.status(400).json({ error: 'Invalid format. Use wav, mp3, flac, or ogg.' });
+      return;
+    }
+    const src = String(req.query.src || req.query.url || '');
+    const localPath = resolveLocalAudioPath(src);
+    if (!localPath) {
+      res.status(404).json({ error: 'Local audio not found' });
+      return;
+    }
+    const outPath = await convertWithFfmpeg(localPath, formatRaw);
+    if (outPath !== localPath) tmpPath = outPath;
+    const title = String(req.query.title || 'song');
+    const filename = safeDownloadName(title, formatRaw);
+    res.setHeader('Content-Type', contentTypeFor(formatRaw));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.sendFile(path.resolve(outPath), (err) => {
+      if (tmpPath) {
+        import('node:fs').then(fs => fs.unlink(tmpPath!, () => {}));
+        tmpPath = null;
+      }
+      if (err && !res.headersSent) res.status(500).json({ error: 'Failed to send file' });
+    });
+  } catch (error: any) {
+    if (tmpPath) {
+      import('node:fs').then(fs => fs.unlink(tmpPath!, () => {}));
+    }
+    console.error('audio export error:', error);
+    res.status(500).json({ error: error?.message || 'Export failed' });
+  }
+});
+
 
 // Audio Editor (AudioMass) - needs relaxed CSP for inline scripts and external images
 app.use('/editor', (req, res, next) => {

@@ -5,22 +5,32 @@ import { config } from '../config/index.js';
 import { resolvePythonPath } from '../services/acestep.js';
 import multer from 'multer';
 import path from 'path';
-import { existsSync, readdirSync, statSync, readFileSync } from 'fs';
+import { createWriteStream, existsSync, mkdirSync, readdirSync, statSync, readFileSync } from 'fs';
+import Busboy from 'busboy';
 import { mkdir, writeFile, readFile } from 'fs/promises';
 import { execSync, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = Router();
 
 // --- Audio upload via multer disk storage ---
-const AUDIO_EXTENSIONS = ['.wav', '.mp3', '.flac', '.ogg', '.opus'];
+const AUDIO_EXTENSIONS = ['.wav', '.mp3', '.flac', '.ogg', '.opus', '.m4a', '.aac', '.aiff', '.webm'];
+
+function safeDatasetName(value: unknown): string {
+  const raw = typeof value === 'string' ? value : 'my_lora_dataset';
+  const cleaned = raw.trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+  return cleaned || 'my_lora_dataset';
+}
 
 const audioStorage = multer.diskStorage({
-  destination: async (_req: Request, _file, cb) => {
-    const datasetName = (_req.body?.datasetName as string) || 'default';
+  destination: (req: Request, _file, cb) => {
+    const datasetName = safeDatasetName(req.query.datasetName || req.body?.datasetName);
     const dest = path.join(config.datasets.uploadsDir, datasetName);
     try {
-      await mkdir(dest, { recursive: true });
+      mkdirSync(dest, { recursive: true });
       cb(null, dest);
     } catch (err) {
       cb(err as Error, dest);
@@ -37,7 +47,7 @@ const audioStorage = multer.diskStorage({
 
 const audioUpload = multer({
   storage: audioStorage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB per file
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB per file
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (AUDIO_EXTENSIONS.includes(ext)) {
@@ -74,31 +84,81 @@ function getAceStepDir(): string {
 // ================== NEW ROUTES ==================
 
 // POST /api/training/upload-audio — Upload audio files for a dataset
-router.post('/upload-audio', authMiddleware, audioUpload.array('audio', 50), async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) {
+router.post('/upload-audio', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  const datasetName = safeDatasetName(req.query.datasetName || req.body?.datasetName);
+  const uploadDir = path.join(config.datasets.uploadsDir, datasetName);
+  mkdirSync(uploadDir, { recursive: true });
+  console.log(`[Training] upload-audio start name=${datasetName} bytes=${req.headers['content-length'] || '?'}`);
+
+  const files: Array<{ filename: string; originalName: string; size: number; path: string }> = [];
+  let pending = 0;
+  let finished = false;
+  let failed = false;
+
+  const send = () => {
+    if (failed || res.headersSent || !finished || pending > 0) return;
+    if (files.length === 0) {
       res.status(400).json({ error: 'No audio files uploaded' });
       return;
     }
+    console.log(`[Training] upload-audio done ${files.length} file(s) -> ${uploadDir}`);
+    res.json({ files, uploadDir, count: files.length });
+  };
 
-    const datasetName = (req.body?.datasetName as string) || 'default';
-    const uploadDir = path.join(config.datasets.uploadsDir, datasetName);
-
-    res.json({
-      files: files.map(f => ({
-        filename: f.filename,
-        originalName: f.originalname,
-        size: f.size,
-        path: f.path,
-      })),
-      uploadDir,
-      count: files.length,
-    });
-  } catch (error) {
-    console.error('[Training] Upload audio error:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Upload failed' });
+  let bb: Busboy.Busboy;
+  try {
+    bb = Busboy({ headers: req.headers, limits: { files: 50, fileSize: 500 * 1024 * 1024 } });
+  } catch (err) {
+    console.error('[Training] upload-audio could not parse request', err);
+    res.status(400).json({ error: 'Upload request was not a file upload' });
+    return;
   }
+
+  bb.on('file', (_field, file, info) => {
+    const original = info.filename || 'audio';
+    const ext = path.extname(original).toLowerCase();
+    if (!AUDIO_EXTENSIONS.includes(ext)) {
+      file.resume();
+      return;
+    }
+    const base = path.basename(original, ext).replace(/[^a-zA-Z0-9_\-. ]/g, '_') || 'audio';
+    const filename = `${base}${ext}`;
+    const dest = path.join(uploadDir, filename);
+    pending += 1;
+    let size = 0;
+    const out = createWriteStream(dest);
+    file.on('data', (chunk: Buffer) => { size += chunk.length; });
+    file.on('limit', () => {
+      failed = true;
+      out.destroy();
+      if (!res.headersSent) res.status(400).json({ error: `${original} is larger than 500MB` });
+    });
+    file.pipe(out);
+    out.on('finish', () => {
+      files.push({ filename, originalName: original, size, path: dest });
+      console.log(`[Training] wrote ${dest} (${size} bytes)`);
+      pending -= 1;
+      send();
+    });
+    out.on('error', (err) => {
+      failed = true;
+      console.error('[Training] upload write failed', err);
+      if (!res.headersSent) res.status(500).json({ error: 'Could not save the audio file' });
+    });
+  });
+
+  bb.on('error', (err: Error) => {
+    failed = true;
+    console.error('[Training] upload-audio parse error', err);
+    if (!res.headersSent) res.status(400).json({ error: err.message || 'Upload failed' });
+  });
+
+  bb.on('finish', () => {
+    finished = true;
+    send();
+  });
+
+  req.pipe(bb);
 });
 
 // POST /api/training/build-dataset — Scan audio directory + create dataset JSON
@@ -128,7 +188,7 @@ router.post('/build-dataset', authMiddleware, async (req: AuthenticatedRequest, 
     // Build samples in Gradio's exact format
     const samples = audioFiles.map(filename => {
       const audioPath = path.join(audioDir, filename);
-      const duration = getAudioDuration(audioPath);
+      const duration = 0;
       const baseName = path.basename(filename, path.extname(filename));
 
       // Check for companion .txt lyrics file
@@ -182,74 +242,46 @@ router.post('/build-dataset', authMiddleware, async (req: AuthenticatedRequest, 
     const jsonPath = path.join(config.datasets.dir, `${datasetName}.json`);
     await writeFile(jsonPath, JSON.stringify(dataset, null, 2), 'utf-8');
 
-    // Now load into Gradio state via the existing endpoint
-    try {
-      const client = await getGradioClient();
-      const result = await client.predict('/load_existing_dataset_for_preprocess', [jsonPath]);
-      const data = result.data as unknown[];
+    const dataframe = {
+      headers: ['filename', 'duration', 'lyrics', 'path'],
+      data: samples.map(s => [s.filename, s.duration, s.lyrics, s.audio_path]),
+    };
 
-      res.json({
-        status: data[0],
-        dataframe: data[1],
-        sampleCount: samples.length,
-        sample: {
-          index: data[2],
-          audio: data[3],
-          filename: data[4],
-          caption: data[5],
-          genre: data[6],
-          promptOverride: data[7],
-          lyrics: data[8],
-          bpm: data[9],
-          key: data[10],
-          timeSignature: data[11],
-          duration: data[12],
-          language: data[13],
-          instrumental: data[14],
-          rawLyrics: data[15],
-        },
-        settings: {
-          datasetName: data[16],
-          customTag: data[17],
-          tagPosition: data[18],
-          allInstrumental: data[19],
-          genreRatio: data[20],
-        },
-        datasetPath: jsonPath,
-      });
-    } catch (gradioError) {
-      // Gradio may not be running — still return dataset info
-      console.warn('[Training] Gradio load failed, returning dataset JSON only:', gradioError);
-      res.json({
-        status: `Dataset saved (${samples.length} samples). Gradio not available for live preview.`,
-        dataframe: null,
-        sampleCount: samples.length,
-        sample: samples.length > 0 ? {
-          index: 0,
-          audio: null,
-          filename: samples[0].filename,
-          caption: samples[0].caption,
-          genre: samples[0].genre,
-          promptOverride: null,
-          lyrics: samples[0].lyrics,
-          bpm: samples[0].bpm,
-          key: samples[0].keyscale,
-          timeSignature: samples[0].timesignature,
-          duration: samples[0].duration,
-          language: samples[0].language,
-          instrumental: samples[0].is_instrumental,
-          rawLyrics: samples[0].raw_lyrics,
-        } : null,
-        settings: {
-          datasetName,
-          customTag,
-          tagPosition,
-          allInstrumental,
-          genreRatio: 0,
-        },
-        datasetPath: jsonPath,
-      });
-    }
+    console.log(`[Training] Saved dataset ${jsonPath} (${samples.length} samples)`);
+    res.json({
+      status: `Saved ${samples.length} file(s) to ${jsonPath}`,
+      dataframe,
+      sampleCount: samples.length,
+      sample: samples.length > 0 ? {
+        index: 0,
+        audio: null,
+        filename: samples[0].filename,
+        caption: samples[0].caption,
+        genre: samples[0].genre,
+        promptOverride: null,
+        lyrics: samples[0].lyrics,
+        bpm: samples[0].bpm,
+        key: samples[0].keyscale,
+        timeSignature: samples[0].timesignature,
+        duration: samples[0].duration,
+        language: samples[0].language,
+        instrumental: samples[0].is_instrumental,
+        rawLyrics: samples[0].raw_lyrics,
+      } : null,
+      settings: {
+        datasetName,
+        customTag,
+        tagPosition,
+        allInstrumental,
+        genreRatio: 0,
+      },
+      datasetPath: jsonPath,
+      savedFiles: samples.map(s => ({
+        filename: s.filename,
+        path: s.audio_path,
+        duration: s.duration,
+      })),
+    });
   } catch (error) {
     console.error('[Training] Build dataset error:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to build dataset' });
@@ -314,7 +346,20 @@ router.post('/preprocess', authMiddleware, async (req: AuthenticatedRequest, res
     const aceStepDir = getAceStepDir();
     const scriptPath = path.resolve(__dirname, '../../scripts/preprocess_dataset.py');
     const pythonPath = resolvePythonPath(aceStepDir);
-    const resolvedOutput = outputDir || path.join(config.datasets.dir, 'preprocessed_tensors');
+    const rawDataset = typeof datasetPath === 'string'
+      ? datasetPath
+      : String((datasetPath && (datasetPath.path || datasetPath.value)) || '');
+    const resolvedDataset = path.isAbsolute(rawDataset)
+      ? rawDataset
+      : path.resolve(aceStepDir, rawDataset);
+    if (!existsSync(resolvedDataset)) {
+      res.status(400).json({ error: `Dataset file not found: ${resolvedDataset}` });
+      return;
+    }
+    const rawOutput = outputDir || path.join(config.datasets.dir, 'preprocessed_tensors');
+    const resolvedOutput = path.isAbsolute(rawOutput)
+      ? rawOutput
+      : path.resolve(aceStepDir, rawOutput);
 
     // Ensure output dir exists
     await mkdir(resolvedOutput, { recursive: true });
@@ -322,7 +367,7 @@ router.post('/preprocess', authMiddleware, async (req: AuthenticatedRequest, res
     // Spawn Python process
     const child = spawn(pythonPath, [
       scriptPath,
-      '--dataset', datasetPath,
+      '--dataset', resolvedDataset,
       '--output', resolvedOutput,
       '--json',
     ], {
@@ -346,11 +391,19 @@ router.post('/preprocess', authMiddleware, async (req: AuthenticatedRequest, res
           res.json({ status: 'Preprocessing complete', output: stdout.trim() });
         }
       } else {
+        const combined = `${stdout}\n${stderr}`;
+        const lines = combined.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const noise = /Skipping import of cpp|Redirects are currently not supported|bitsandbytes not installed|torch_dtype` is deprecated|Attempting to load model|\\| INFO|\\| WARNING/;
+        const useful = lines.filter((l) => !noise.test(l));
+        const hit = [...useful].reverse().find((l) => /PREPROCESS_ERROR|Could not load model|Traceback|Error|Exception|Failed|failed/.test(l));
+        const detail = (hit || useful.slice(-1)[0] || 'Preprocessing failed').slice(0, 500);
+        console.error('[Training] Preprocess failed:', detail);
+        console.error('[Training] Preprocess raw tail:', useful.slice(-8).join(' | ').slice(0, 1500));
         res.status(500).json({
-          error: 'Preprocessing failed',
+          error: detail,
           code,
-          stderr: stderr.trim(),
-          stdout: stdout.trim(),
+          stderr: useful.slice(-12).join('\n').slice(0, 2000),
+          stdout: stdout.trim().slice(-2000),
         });
       }
     });
@@ -726,37 +779,44 @@ router.post('/update-settings', authMiddleware, (_req: AuthenticatedRequest, res
 router.post('/save-dataset', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { savePath, datasetName, customTag, tagPosition, allInstrumental, genreRatio } = req.body;
+    const name = (datasetName ?? 'my_lora_dataset').toString().trim() || 'my_lora_dataset';
+    const engineRoot = process.env.ACESTEP_PATH || 'E:\\ACE-Step-1.5';
+    const requested = (savePath ?? `./datasets/${name}.json`).toString().trim();
+    const dest = path.isAbsolute(requested)
+      ? requested
+      : path.resolve(engineRoot, requested.replace(/^\.\//, '').replace(/^\.\\/, ''));
 
-    const resolvedPath = (savePath ?? `./datasets/${datasetName ?? 'my_lora_dataset'}.json`).trim();
+    await mkdir(path.dirname(dest), { recursive: true });
 
-    // Use REST API to avoid @gradio/client Radio serialization issues
-    const apiUrl = config.acestep.apiUrl;
-    const body: Record<string, unknown> = {
-      save_path: resolvedPath,
-      dataset_name: datasetName ?? 'my_lora_dataset',
-    };
-    if (customTag !== undefined) body.custom_tag = customTag;
-    if (tagPosition !== undefined) body.tag_position = tagPosition;
-    if (allInstrumental !== undefined) body.all_instrumental = allInstrumental;
-    if (genreRatio !== undefined) body.genre_ratio = genreRatio;
-
-    const apiRes = await fetch(`${apiUrl}/v1/dataset/save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (!apiRes.ok) {
-      const err = await apiRes.json().catch(() => ({})) as any;
-      throw new Error(err?.detail || err?.error || `Save failed: ${apiRes.status}`);
+    const candidates = [
+      dest,
+      path.join(config.datasets.dir, `${name}.json`),
+      path.join(engineRoot, 'datasets', `${name}.json`),
+    ];
+    let dataset: any = null;
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) {
+        dataset = JSON.parse(await readFile(candidate, 'utf-8'));
+        break;
+      }
     }
+    if (!dataset || typeof dataset !== 'object') {
+      dataset = { metadata: {}, samples: [] };
+    }
+    if (!Array.isArray(dataset.samples)) dataset.samples = [];
+    dataset.metadata = {
+      ...(dataset.metadata || {}),
+      name,
+      custom_tag: customTag ?? dataset.metadata?.custom_tag ?? '',
+      tag_position: tagPosition ?? dataset.metadata?.tag_position ?? 'prepend',
+      all_instrumental: allInstrumental ?? dataset.metadata?.all_instrumental ?? true,
+      genre_ratio: genreRatio ?? dataset.metadata?.genre_ratio ?? 0,
+      num_samples: dataset.samples.length,
+    };
 
-    const data = await apiRes.json() as any;
-    res.json({
-      status: data.status ?? 'Saved',
-      path: data.save_path ?? resolvedPath,
-    });
+    await writeFile(dest, JSON.stringify(dataset, null, 2), 'utf-8');
+
+    res.json({ status: 'Saved', path: dest });
   } catch (error) {
     console.error('[Training] Save dataset error:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to save dataset' });
@@ -781,38 +841,49 @@ router.post('/load-tensors', authMiddleware, async (req: AuthenticatedRequest, r
   }
 });
 
-// POST /api/training/start — Start LoRA training
+// POST /api/training/start — Start LoRA training and return immediately
 router.post('/start', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
       tensorDir, rank, alpha, dropout, learningRate,
       epochs, batchSize, gradientAccumulation, saveEvery,
-      shift, seed, outputDir, resumeCheckpoint,
-    } = req.body;
+      seed, outputDir,
+    } = req.body ?? {};
 
-    const client = await getGradioClient();
-    const result = await client.predict('/training_wrapper', [
-      tensorDir ?? './datasets/preprocessed_tensors',
-      rank ?? 64,
-      alpha ?? 128,
-      dropout ?? 0.1,
-      learningRate ?? 0.0003,
-      epochs ?? 1000,
-      batchSize ?? 1,
-      gradientAccumulation ?? 1,
-      saveEvery ?? 200,
-      shift ?? 3.0,
-      seed ?? 42,
-      outputDir ?? './lora_output',
-      resumeCheckpoint ?? null,
-    ]);
-    const data = result.data as unknown[];
-
-    // Returns: [trainingProgress, trainingLog, lineplotData]
+    const aceStepDir = config.acestep?.path || 'E:\\ACE-Step-1.5';
+    const resolveOut = (value: unknown, fallback: string) => {
+      const raw = typeof value === 'string' && value.trim() ? value.trim() : fallback;
+      return path.isAbsolute(raw) ? raw : path.resolve(aceStepDir, raw.replace(/^\.[\\/]/, ''));
+    };
+    const tensorPath = resolveOut(tensorDir, path.join(aceStepDir, 'datasets', 'preprocessed_tensors'));
+    const outputPath = resolveOut(outputDir, path.join(aceStepDir, 'lora_output'));
+    const scriptPath = path.resolve(__dirname, '../../scripts/start_lora.py');
+    const logPath = path.resolve(__dirname, '../../train-run.log');
+    const child = spawn(resolvePythonPath(aceStepDir), [
+      scriptPath,
+      '--tensor-dir', tensorPath,
+      '--output', outputPath,
+      '--rank', String(rank ?? 64),
+      '--alpha', String(alpha ?? 128),
+      '--dropout', String(dropout ?? 0.1),
+      '--lr', String(learningRate ?? 0.0003),
+      '--epochs', String(epochs ?? 100),
+      '--batch-size', String(batchSize ?? 1),
+      '--grad-accum', String(gradientAccumulation ?? 1),
+      '--save-every', String(saveEvery ?? 10),
+      '--seed', String(seed ?? 42),
+    ], {
+      cwd: aceStepDir,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+    console.log('[Training] started', child.pid, tensorPath);
     res.json({
-      progress: data[0],
-      log: data[1],
-      metrics: data[2],
+      progress: `Training started. Tensors: ${tensorPath}. Output: ${outputPath}. Log: ${logPath}`,
+      log: 'Started in the background. The page no longer waits for the whole run.',
+      metrics: null,
     });
   } catch (error) {
     console.error('[Training] Start training error:', error);

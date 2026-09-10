@@ -16,7 +16,7 @@ const AUDIO_DIR = path.join(__dirname, '../../public/audio');
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max (album masters)
   fileFilter: (_req, file, cb) => {
     const allowedTypes = [
       'audio/mpeg',
@@ -38,6 +38,20 @@ const upload = multer({
   }
 });
 
+
+function handleMulterError(err: unknown, res: Response): boolean {
+  if (!err) return false;
+  const anyErr = err as { code?: string; message?: string };
+  if (anyErr.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ error: 'File too large. Max upload size is 500MB.' });
+    return true;
+  }
+  if (err instanceof Error && /Invalid file type/i.test(err.message)) {
+    res.status(400).json({ error: err.message });
+    return true;
+  }
+  return false;
+}
 const findWhisperExecutable = async (): Promise<string | null> => {
   if (process.env.WHISPER_CMD) return process.env.WHISPER_CMD;
   const customPath = process.env.WHISPER_PATH;
@@ -150,7 +164,17 @@ router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response)
 });
 
 // Upload a new reference track
-router.post('/', authMiddleware, upload.single('audio'), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/', authMiddleware, (req: AuthenticatedRequest, res: Response, next) => {
+  upload.single('audio')(req, res, (err: unknown) => {
+    if (handleMulterError(err, res)) return;
+    if (err) {
+      console.error('Upload multer error:', err);
+      res.status(500).json({ error: 'Internal server error', details: err instanceof Error ? err.message : String(err) });
+      return;
+    }
+    next();
+  });
+}, async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No file uploaded' });

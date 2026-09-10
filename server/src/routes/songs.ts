@@ -4,6 +4,16 @@ import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/pool.js';
 import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  convertWithFfmpeg,
+  contentTypeFor,
+  isExportFormat,
+  resolveLocalAudioPath,
+  safeDownloadName,
+  type ExportFormat,
+} from '../services/ffmpegExport.js';
 
 const router = Router();
 
@@ -100,6 +110,61 @@ router.get('/:id/audio', optionalAuthMiddleware, async (req: AuthenticatedReques
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+
+// Download / export via ffmpeg (wav/mp3/flac/ogg)
+router.get('/:id/download', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  let tmpPath: string | null = null;
+  try {
+    const formatRaw = String(req.query.format || 'wav').toLowerCase();
+    if (!isExportFormat(formatRaw)) {
+      res.status(400).json({ error: 'Invalid format. Use wav, mp3, flac, or ogg.' });
+      return;
+    }
+    const format = formatRaw as ExportFormat;
+
+    const result = await pool.query(
+      `SELECT s.audio_url, s.title, s.is_public, s.user_id FROM songs s WHERE s.id = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Song not found' });
+      return;
+    }
+    const song = result.rows[0];
+    if (!song.is_public && (!req.user || req.user.id !== song.user_id)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const localPath = resolveLocalAudioPath(song.audio_url || '');
+    if (!localPath) {
+      res.status(404).json({ error: 'Local audio file not found for export (ffmpeg needs a local file).' });
+      return;
+    }
+
+    const outPath = await convertWithFfmpeg(localPath, format);
+    if (outPath !== localPath) tmpPath = outPath;
+
+    const filename = safeDownloadName(song.title, format);
+    res.setHeader('Content-Type', contentTypeFor(format));
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.sendFile(path.resolve(outPath), (err) => {
+      if (tmpPath) {
+        fs.unlink(tmpPath, () => {});
+        tmpPath = null;
+      }
+      if (err && !res.headersSent) {
+        res.status(500).json({ error: 'Failed to send file' });
+      }
+    });
+  } catch (error) {
+    if (tmpPath) fs.unlink(tmpPath, () => {});
+    console.error('Download export error:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Export failed' });
+  }
+});
+
 
 // Get user's songs
 router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {

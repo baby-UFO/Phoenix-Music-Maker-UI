@@ -7,6 +7,7 @@ import { useI18n } from '../context/I18nContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
 import { AlbumCover } from './AlbumCover';
+import { downloadSongAudio, DOWNLOAD_FORMATS, type DownloadFormat } from '../utils/downloadAudio';
 
 interface RightSidebarProps {
     song: Song | null;
@@ -346,20 +347,19 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                 className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                                 title={t('downloadAudio')}
                                 onClick={async () => {
-                                    if (!song.audioUrl) return;
+                                    const pick = window.prompt('Download format: original / wav / mp3 / flac / ogg', 'wav');
+                                    if (!pick) return;
+                                    const format = pick.trim().toLowerCase() as DownloadFormat;
                                     try {
-                                        const response = await fetch(song.audioUrl);
-                                        const blob = await response.blob();
-                                        const url = URL.createObjectURL(blob);
-                                        const link = document.createElement('a');
-                                        link.href = url;
-                                        link.download = `${song.title || 'song'}.mp3`;
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                        URL.revokeObjectURL(url);
+                                        await downloadSongAudio({
+                                            audioUrl: song.audioUrl,
+                                            title: song.title,
+                                            songId: song.id,
+                                            format: (['original','wav','mp3','flac','ogg'].includes(format) ? format : 'wav') as DownloadFormat,
+                                        });
                                     } catch (error) {
                                         console.error('Download failed:', error);
+                                        alert(error instanceof Error ? error.message : 'Download failed');
                                     }
                                 }}
                             >

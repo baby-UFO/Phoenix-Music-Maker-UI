@@ -13,9 +13,21 @@ The --json flag makes the script output a final JSON summary line to stdout.
 """
 
 import argparse
+import faulthandler
 import json
 import os
 import sys
+import traceback
+
+faulthandler.enable()
+LOG_PATH = r"E:\ace-step\server\preprocess-last.log"
+
+def log(msg: str) -> None:
+    try:
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(msg.rstrip() + "\n")
+    except Exception:
+        pass
 
 def main():
     parser = argparse.ArgumentParser(description="Preprocess dataset to tensors for LoRA training")
@@ -51,14 +63,15 @@ def main():
         print("Make sure this script is run from the ACE-Step-1.5 directory or with the correct Python environment.", file=sys.stderr)
         sys.exit(1)
 
-    # Load dataset JSON
+    # Load dataset JSON through the real builder API
     print(f"Loading dataset: {args.dataset}")
-    with open(args.dataset, "r") as f:
-        dataset_data = json.load(f)
-
-    # Reconstruct DatasetBuilder from JSON
     builder = DatasetBuilder()
-    builder.load_from_dict(dataset_data)
+    samples, status = builder.load_dataset(args.dataset)
+    if not samples:
+        print(status, file=sys.stderr)
+        if args.json:
+            print(json.dumps({"status": "error", "message": status}))
+        sys.exit(1)
 
     labeled_count = sum(1 for s in builder.samples if s.labeled)
     total_count = len(builder.samples)
@@ -71,38 +84,31 @@ def main():
             print(json.dumps({"status": "error", "message": msg, "labeled": 0, "total": total_count}))
         sys.exit(1)
 
-    # Load models for preprocessing
+    # Load the already-installed ACE-Step 1.5 handler. The old ACEStepPipeline class is not in this build.
     print("Loading models for preprocessing (this may take a moment)...")
     try:
-        from acestep.pipeline_ace_step import ACEStepPipeline
+        from acestep.handler import AceStepHandler
 
-        checkpoint_dir = os.path.join(ace_step_root, "checkpoints")
-        if not os.path.isdir(checkpoint_dir):
-            checkpoint_dir = os.path.join(ace_step_root, "checkpoints", "ACE-Step-v1.5")
-
-        pipe = ACEStepPipeline(checkpoint_dir=checkpoint_dir)
-        pipe.load_checkpoint()
-
-        # Create a minimal dit_handler-like object for preprocess_to_tensors
-        class DitHandlerProxy:
-            def __init__(self, pipeline):
-                self.model = pipeline.dit
-                self.vae = pipeline.vae
-                self.text_encoder = pipeline.text_encoder
-                self.text_tokenizer = pipeline.text_tokenizer
-                self.silence_latent = getattr(pipeline, "silence_latent", None)
-                self.device = pipeline.device
-                self.dtype = pipeline.dtype
-
-        handler = DitHandlerProxy(pipe)
+        handler = AceStepHandler()
+        status_msg, ok = handler.initialize_service(
+            project_root=ace_step_root,
+            config_path="acestep-v15-turbo",
+            device="cuda",
+            offload_to_cpu=True,
+            offload_dit_to_cpu=True,
+        )
+        if not ok or handler.model is None:
+            raise RuntimeError(status_msg or "Model did not initialize")
+        print(status_msg)
     except Exception as e:
-        # If pipeline loading fails, try a simpler approach
-        print(f"Warning: Could not load full pipeline: {e}", file=sys.stderr)
-        print("Preprocessing requires model access. Please use the Gradio UI for preprocessing.", file=sys.stderr)
+        msg = f"PREPROCESS_ERROR: Could not load model: {e}"
+        print(msg, file=sys.stderr)
+        log(msg)
+        log(traceback.format_exc())
         if args.json:
             print(json.dumps({
                 "status": "error",
-                "message": f"Model loading failed: {str(e)}. Use Gradio UI preprocess instead.",
+                "message": f"Model loading failed: {str(e)}",
                 "labeled": labeled_count,
                 "total": total_count,
             }))

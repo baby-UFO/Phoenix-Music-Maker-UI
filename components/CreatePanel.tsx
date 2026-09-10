@@ -120,6 +120,133 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const { isAuthenticated, token, user } = useAuth();
   const { t } = useI18n();
 
+  // ---- Persisted Create defaults (survive hard refresh) ----
+  const CREATE_SETTINGS_KEY = 'ace-create-settings-v3c';
+  type CreateSettings = {
+    customMode?: boolean;
+    songDescription?: string;
+    lyrics?: string;
+    style?: string;
+    title?: string;
+    instrumental?: boolean;
+    vocalLanguage?: string;
+    vocalGender?: '' | 'male' | 'female';
+    bpm?: number;
+    keyScale?: string;
+    timeSignature?: string;
+    showAdvanced?: boolean;
+    duration?: number;
+    guidanceScale?: number;
+    randomSeed?: boolean;
+    seed?: number;
+    thinking?: boolean;
+    enhance?: boolean;
+    audioFormat?: 'mp3' | 'flac';
+    inferenceSteps?: number;
+    inferMethod?: 'ode' | 'sde';
+    lmBackend?: 'pt' | 'vllm';
+    shift?: number;
+    showLmParams?: boolean;
+    lmTemperature?: number;
+    lmCfgScale?: number;
+    lmTopK?: number;
+    lmTopP?: number;
+    lmNegativePrompt?: string;
+    instruction?: string;
+    audioCoverStrength?: number;
+    taskType?: string;
+    useAdg?: boolean;
+    cfgIntervalStart?: number;
+    cfgIntervalEnd?: number;
+    customTimesteps?: string;
+    useCotMetas?: boolean;
+    useCotCaption?: boolean;
+    useCotLanguage?: boolean;
+    autogen?: boolean;
+    allowLmBatch?: boolean;
+    getScores?: boolean;
+    getLrc?: boolean;
+    scoreScale?: number;
+    lmBatchChunkSize?: number;
+    isFormatCaption?: boolean;
+    showLoraPanel?: boolean;
+    loraPath?: string;
+    loraEnabled?: boolean;
+    loraScale?: number;
+  };
+
+  const BUILTIN_CREATE_DEFAULTS: CreateSettings = {
+    customMode: true,
+    lyrics: "[verse]\nGrew up where the roads stay broke and the power blink\nTephra in the air, still I stay in the link\nThey said ain't no work out here, pack it up and leave\nThen the line went live and I started to breathe\n\nLaptop in the shade, moss on the screen\nClient on the call like where you even been\nJungle bruh, fiber running through the green\nObama signed the check, now the pipeline clean\n\n[chorus]\nObama brought the fiber to the jungle\nNow I'm booking gigs, no more struggle\n808 slide, bass start to rumble\nDrop hit hard, whole canopy crumble\n\nGetting gigs in the jungle, yeah I'm on\nRemote from the vines, still get it gone\nFiber in the dirt, signal never wrong\nDrill in the mix when the wobble come on\n\n[drop]\n\n[verse]\nThey paved the park roads, left the residents last\nI stayed in the cut, let the signal hold fast\nGenerator kick, solar on the roof\nFiber in the ground, that's the real living proof\n\nGigs in the morning, gigs when the sun go down\nJungle don't sleep and neither do the sound\nDubstep in the chest, drill in the flow\nWhole island shaking when the drop let go\n\n[chorus]\nObama brought the fiber to the jungle\nNow I'm booking gigs, no more struggle\n808 slide, bass start to rumble\nDrop hit hard, whole canopy crumble\n\n[Instrumental Break]\n[Shouted]\nGicks in the jungle!\n\n[Outro]\n[Beat fades out, leaving synth pads and bass]\n[Final distorted synth note fades]",
+    style: "James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature oratorical delivery, rumbling low register, no tenor (~170 Hz+), no light pop tenor, babyUFO style, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive",
+    title: "gigs3",
+    instrumental: false,
+    vocalLanguage: 'en',
+    vocalGender: 'male',
+    bpm: 120,
+    keyScale: '',
+    timeSignature: '4/4',
+    showAdvanced: true,
+    duration: 234,
+    guidanceScale: 10.5,
+    randomSeed: true,
+    seed: -1,
+    thinking: false,
+    enhance: false,
+    audioFormat: 'flac',
+    inferenceSteps: 200,
+    inferMethod: 'sde',
+    lmBackend: 'vllm',
+    shift: 3.0,
+    showLmParams: true,
+    lmTemperature: 0.8,
+    lmCfgScale: 2.2,
+    lmTopK: 0,
+    lmTopP: 0.92,
+    lmNegativePrompt: 'NO USER INPUT',
+    instruction: 'Fill the audio semantic mask based on the given conditions:',
+    audioCoverStrength: 1.0,
+    taskType: 'text2music',
+    useAdg: false,
+    cfgIntervalStart: 0.0,
+    cfgIntervalEnd: 1.0,
+    customTimesteps: '',
+    useCotMetas: true,
+    useCotCaption: true,
+    useCotLanguage: true,
+    autogen: false,
+    allowLmBatch: true,
+    getScores: false,
+    getLrc: false,
+    scoreScale: 0.5,
+    lmBatchChunkSize: 8,
+    isFormatCaption: false,
+    showLoraPanel: true,
+    loraPath: 'E:\ACE-Step-1.5\lora_output_v3b\final\adapter',
+    loraEnabled: true,
+    loraScale: 1.0,
+  };
+
+  const loadCreateSettings = (): CreateSettings => {
+    try {
+      const raw = localStorage.getItem(CREATE_SETTINGS_KEY);
+      if (!raw) return { ...BUILTIN_CREATE_DEFAULTS };
+      const parsed = { ...BUILTIN_CREATE_DEFAULTS, ...JSON.parse(raw) } as CreateSettings;
+      // Always prefer the v2 style adapter if saved path is missing/old
+      const bad = !parsed.loraPath || /lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v3b/.test(parsed.loraPath);
+      if (bad) parsed.loraPath = 'E:\\ACE-Step-1.5\\lora_output_v3b\\final\\adapter';
+      return parsed;
+    } catch {
+      return { ...BUILTIN_CREATE_DEFAULTS };
+    }
+  };
+
+  const savedCreate = loadCreateSettings();
+  const cs = <T,>(key: keyof CreateSettings, fallback: T): T => {
+    const v = savedCreate[key];
+    return (v !== undefined && v !== null ? v : fallback) as T;
+  };
+
   // Randomly select 6 music tags from MAIN_STYLES
   const [musicTags, setMusicTags] = useState<string[]>(() => {
     const shuffled = [...MAIN_STYLES].sort(() => Math.random() - 0.5);
@@ -133,29 +260,29 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   }, []);
 
   // Mode
-  const [customMode, setCustomMode] = useState(true);
+  const [customMode, setCustomMode] = useState(cs('customMode', true));
 
   // Simple Mode
-  const [songDescription, setSongDescription] = useState('');
+  const [songDescription, setSongDescription] = useState(cs('songDescription', ''));
 
   // Custom Mode
-  const [lyrics, setLyrics] = useState('');
-  const [style, setStyle] = useState('');
-  const [title, setTitle] = useState('');
+  const [lyrics, setLyrics] = useState(cs('lyrics', ''));
+  const [style, setStyle] = useState(cs('style', ''));
+  const [title, setTitle] = useState(cs('title', ''));
 
   // Common
-  const [instrumental, setInstrumental] = useState(false);
-  const [vocalLanguage, setVocalLanguage] = useState('en');
-  const [vocalGender, setVocalGender] = useState<'male' | 'female' | ''>('');
+  const [instrumental, setInstrumental] = useState(cs('instrumental', false));
+  const [vocalLanguage, setVocalLanguage] = useState(cs('vocalLanguage', 'en'));
+  const [vocalGender, setVocalGender] = useState<'male' | 'female' | ''>(cs('vocalGender', 'male'));
 
   // Music Parameters
-  const [bpm, setBpm] = useState(0);
-  const [keyScale, setKeyScale] = useState('');
-  const [timeSignature, setTimeSignature] = useState('');
+  const [bpm, setBpm] = useState(cs('bpm', 120));
+  const [keyScale, setKeyScale] = useState(cs('keyScale', ''));
+  const [timeSignature, setTimeSignature] = useState(cs('timeSignature', '4/4'));
 
   // Advanced Settings
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [duration, setDuration] = useState(-1);
+  const [showAdvanced, setShowAdvanced] = useState(cs('showAdvanced', true));
+  const [duration, setDuration] = useState(cs('duration', 234));
   const [batchSize, setBatchSize] = useState(() => {
     const stored = localStorage.getItem('ace-batchSize');
     return stored ? Number(stored) : 1;
@@ -164,27 +291,27 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     const stored = localStorage.getItem('ace-bulkCount');
     return stored ? Number(stored) : 1;
   });
-  const [guidanceScale, setGuidanceScale] = useState(9.0);
-  const [randomSeed, setRandomSeed] = useState(true);
-  const [seed, setSeed] = useState(-1);
-  const [thinking, setThinking] = useState(false); // Default false for GPU compatibility
-  const [enhance, setEnhance] = useState(false); // AI Enhance: uses LLM to enrich caption & generate metadata
-  const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>('mp3');
-  const [inferenceSteps, setInferenceSteps] = useState(12);
-  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
-  const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>('pt');
+  const [guidanceScale, setGuidanceScale] = useState(cs('guidanceScale', 10.5));
+  const [randomSeed, setRandomSeed] = useState(cs('randomSeed', true));
+  const [seed, setSeed] = useState(cs('seed', -1));
+  const [thinking, setThinking] = useState(cs('thinking', false)); // BPM path may still force Think server-side
+  const [enhance, setEnhance] = useState(cs('enhance', false));
+  const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>(cs('audioFormat', 'flac'));
+  const [inferenceSteps, setInferenceSteps] = useState(cs('inferenceSteps', 200));
+  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(cs('inferMethod', 'sde'));
+  const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>(cs('lmBackend', 'vllm'));
   const [lmModel, setLmModel] = useState(() => {
-    return localStorage.getItem('ace-lmModel') || 'acestep-5Hz-lm-0.6B';
+    return localStorage.getItem('ace-lmModel') || 'acestep-5Hz-lm-4B';
   });
-  const [shift, setShift] = useState(3.0);
+  const [shift, setShift] = useState(cs('shift', 3.0));
 
   // LM Parameters (under Expert)
-  const [showLmParams, setShowLmParams] = useState(false);
-  const [lmTemperature, setLmTemperature] = useState(0.8);
-  const [lmCfgScale, setLmCfgScale] = useState(2.2);
-  const [lmTopK, setLmTopK] = useState(0);
-  const [lmTopP, setLmTopP] = useState(0.92);
-  const [lmNegativePrompt, setLmNegativePrompt] = useState('NO USER INPUT');
+  const [showLmParams, setShowLmParams] = useState(cs('showLmParams', true));
+  const [lmTemperature, setLmTemperature] = useState(cs('lmTemperature', 0.8));
+  const [lmCfgScale, setLmCfgScale] = useState(cs('lmCfgScale', 2.2));
+  const [lmTopK, setLmTopK] = useState(cs('lmTopK', 0));
+  const [lmTopP, setLmTopP] = useState(cs('lmTopP', 0.92));
+  const [lmNegativePrompt, setLmNegativePrompt] = useState(cs('lmNegativePrompt', 'NO USER INPUT'));
 
   // Expert Parameters (now in Advanced section)
   const [referenceAudioUrl, setReferenceAudioUrl] = useState('');
@@ -194,37 +321,66 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [audioCodes, setAudioCodes] = useState('');
   const [repaintingStart, setRepaintingStart] = useState(0);
   const [repaintingEnd, setRepaintingEnd] = useState(-1);
-  const [instruction, setInstruction] = useState('Fill the audio semantic mask based on the given conditions:');
-  const [audioCoverStrength, setAudioCoverStrength] = useState(1.0);
-  const [taskType, setTaskType] = useState('text2music');
-  const [useAdg, setUseAdg] = useState(false);
-  const [cfgIntervalStart, setCfgIntervalStart] = useState(0.0);
-  const [cfgIntervalEnd, setCfgIntervalEnd] = useState(1.0);
-  const [customTimesteps, setCustomTimesteps] = useState('');
-  const [useCotMetas, setUseCotMetas] = useState(true);
-  const [useCotCaption, setUseCotCaption] = useState(true);
-  const [useCotLanguage, setUseCotLanguage] = useState(true);
-  const [autogen, setAutogen] = useState(false);
+  const [instruction, setInstruction] = useState(cs('instruction', 'Fill the audio semantic mask based on the given conditions:'));
+  const [audioCoverStrength, setAudioCoverStrength] = useState(cs('audioCoverStrength', 1.0));
+  const [taskType, setTaskType] = useState(cs('taskType', 'text2music'));
+  const [useAdg, setUseAdg] = useState(cs('useAdg', false));
+  const [cfgIntervalStart, setCfgIntervalStart] = useState(cs('cfgIntervalStart', 0.0));
+  const [cfgIntervalEnd, setCfgIntervalEnd] = useState(cs('cfgIntervalEnd', 1.0));
+  const [customTimesteps, setCustomTimesteps] = useState(cs('customTimesteps', ''));
+  const [useCotMetas, setUseCotMetas] = useState(cs('useCotMetas', true));
+  const [useCotCaption, setUseCotCaption] = useState(cs('useCotCaption', true));
+  const [useCotLanguage, setUseCotLanguage] = useState(cs('useCotLanguage', true));
+  const [autogen, setAutogen] = useState(cs('autogen', false));
   const [constrainedDecodingDebug, setConstrainedDecodingDebug] = useState(false);
-  const [allowLmBatch, setAllowLmBatch] = useState(true);
-  const [getScores, setGetScores] = useState(false);
-  const [getLrc, setGetLrc] = useState(false);
-  const [scoreScale, setScoreScale] = useState(0.5);
-  const [lmBatchChunkSize, setLmBatchChunkSize] = useState(8);
+  const [allowLmBatch, setAllowLmBatch] = useState(cs('allowLmBatch', true));
+  const [getScores, setGetScores] = useState(cs('getScores', false));
+  const [getLrc, setGetLrc] = useState(cs('getLrc', false));
+  const [scoreScale, setScoreScale] = useState(cs('scoreScale', 0.5));
+  const [lmBatchChunkSize, setLmBatchChunkSize] = useState(cs('lmBatchChunkSize', 8));
   const [trackName, setTrackName] = useState('');
   const [completeTrackClasses, setCompleteTrackClasses] = useState('');
-  const [isFormatCaption, setIsFormatCaption] = useState(false);
+  const [isFormatCaption, setIsFormatCaption] = useState(cs('isFormatCaption', false));
   const [maxDurationWithLm, setMaxDurationWithLm] = useState(240);
   const [maxDurationWithoutLm, setMaxDurationWithoutLm] = useState(240);
 
   // LoRA Parameters
-  const [showLoraPanel, setShowLoraPanel] = useState(false);
-  const [loraPath, setLoraPath] = useState('./lora_output/final/adapter');
+  const [showLoraPanel, setShowLoraPanel] = useState(cs('showLoraPanel', true));
+  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\ACE-Step-1.5\lora_output_v3b\final\adapter'));
   const [loraLoaded, setLoraLoaded] = useState(false);
-  const [loraEnabled, setLoraEnabled] = useState(true);
-  const [loraScale, setLoraScale] = useState(1.0);
+  const [loraEnabled, setLoraEnabled] = useState(cs('loraEnabled', true));
+  const [loraScale, setLoraScale] = useState(cs('loraScale', 1.0));
   const [loraError, setLoraError] = useState<string | null>(null);
   const [isLoraLoading, setIsLoraLoading] = useState(false);
+
+  // Persist Create settings so hard refresh keeps your dialed-in setup
+  useEffect(() => {
+    const payload: CreateSettings = {
+      customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender,
+      bpm, keyScale, timeSignature, showAdvanced, duration, guidanceScale, randomSeed, seed,
+      thinking, enhance, audioFormat, inferenceSteps, inferMethod, lmBackend, shift, showLmParams,
+      lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, instruction, audioCoverStrength,
+      taskType, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption,
+      useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize,
+      isFormatCaption, showLoraPanel, loraPath, loraEnabled, loraScale,
+    };
+    try {
+      localStorage.setItem(CREATE_SETTINGS_KEY, JSON.stringify(payload));
+      localStorage.setItem('ace-lmModel', lmModel);
+      localStorage.setItem('ace-batchSize', String(batchSize));
+      localStorage.setItem('ace-bulkCount', String(bulkCount));
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [
+    customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender,
+    bpm, keyScale, timeSignature, showAdvanced, duration, guidanceScale, randomSeed, seed,
+    thinking, enhance, audioFormat, inferenceSteps, inferMethod, lmBackend, lmModel, shift, showLmParams,
+    lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, instruction, audioCoverStrength,
+    taskType, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption,
+    useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize,
+    isFormatCaption, showLoraPanel, loraPath, loraEnabled, loraScale, batchSize, bulkCount,
+  ]);
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
@@ -368,6 +524,41 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       if (useAdg) setUseAdg(false);
     }
   }, [loraLoaded]);
+
+
+  // Auto-load LoRA on mount so hard refresh doesn't leave the wrong/unloaded adapter
+  useEffect(() => {
+    if (!token) return;
+    if (!loraPath.trim()) return;
+    if (loraLoaded || isLoraLoading) return;
+    let cancelled = false;
+    (async () => {
+      setIsLoraLoading(true);
+      setLoraError(null);
+      try {
+        await generateApi.loadLora({ lora_path: loraPath }, token);
+        if (!cancelled) {
+          setLoraLoaded(true);
+          if (loraScale !== 1) {
+            await generateApi.setLoraScale({ scale: loraScale }, token);
+          }
+          if (!loraEnabled) {
+            await generateApi.toggleLora({ enabled: false }, token);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : 'Failed to auto-load LoRA';
+          setLoraError(message);
+        }
+      } finally {
+        if (!cancelled) setIsLoraLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // intentionally once per path/token
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, loraPath]);
 
   // LoRA API handlers
   const handleLoraToggle = async () => {
@@ -967,11 +1158,42 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   const handleGenerate = () => {
     const styleWithGender = (() => {
-      if (!vocalGender) return style;
-      const genderHint = vocalGender === 'male' ? 'Male vocals' : 'Female vocals';
       const trimmed = style.trim();
-      return trimmed ? `${trimmed}\n${genderHint}` : genderHint;
+      const hasVocalDetail = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|low male|deep male)\b/i.test(trimmed);
+      if (!vocalGender) {
+        // Still prefer vocal detail at the front if present
+        return promoteVocalFront(trimmed);
+      }
+      const genderHint = vocalGender === 'male'
+        ? 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature oratorical delivery, rumbling low register, no tenor (~170 Hz+), no light pop tenor'
+        : 'female vocals';
+      // Don't stack a weak "Male vocals" if the style already describes the voice
+      if (hasVocalDetail) return promoteVocalFront(trimmed);
+      return promoteVocalFront(trimmed ? `${genderHint}, ${trimmed}` : genderHint);
     })();
+
+    function promoteVocalFront(caption: string): string {
+      if (!caption) return caption;
+      // Pull voice-related clauses to the front so the LM/DiT condition on them first
+      const parts = caption.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
+      const vocalRe = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered)\b/i;
+      const vocal = parts.filter((p) => vocalRe.test(p));
+      const other = parts.filter((p) => !vocalRe.test(p));
+      // Drop redundant bare "Male vocals" / "Female vocals" if richer vocal phrases exist
+      const rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
+      const useVocal = rich.length ? rich : vocal;
+      const merged = [...useVocal, ...other];
+      // de-dupe case-insensitive
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const p of merged) {
+        const k = p.toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(p);
+      }
+      return out.join(', ');
+    }
 
     // Bulk generation: loop bulkCount times
     for (let i = 0; i < bulkCount; i++) {
@@ -990,7 +1212,15 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         prompt: lyrics,
         lyrics,
         style: styleWithGender,
-        title: bulkCount > 1 ? `${title} (${i + 1})` : title,
+        title: (() => {
+          const pad = (n: number) => String(n).padStart(2, '0');
+          const d = new Date();
+          const stamp = `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+          const base = title.trim()
+            || (styleWithGender.trim().split(/\s+/).slice(0, 4).join(' ') || 'Track');
+          const named = title.trim() ? base : `${base} · ${stamp}`;
+          return bulkCount > 1 ? `${named} (${i + 1})` : named;
+        })(),
         ditModel: selectedModel,
         instrumental,
         vocalLanguage,

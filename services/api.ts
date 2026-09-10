@@ -626,7 +626,7 @@ export function getTrainingAudioUrl(audioPath: unknown, token?: string): string 
 
 export const trainingApi = {
   // Upload audio files for a dataset
-  uploadAudio: async (files: File[], datasetName: string, token: string): Promise<{
+  uploadAudio: (files: File[], datasetName: string, token: string, onProgress?: (pct: number) => void): Promise<{
     files: Array<{ filename: string; originalName: string; size: number; path: string }>;
     uploadDir: string;
     count: number;
@@ -636,16 +636,33 @@ export const trainingApi = {
     for (const file of files) {
       formData.append('audio', file);
     }
-    const response = await fetch(`${API_BASE}/api/training/upload-audio`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
+    const url = `/api/training/upload-audio?datasetName=${encodeURIComponent(datasetName)}`;
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.timeout = 10 * 60 * 1000;
+      xhr.upload.onprogress = (ev) => {
+        if (!onProgress || !ev.lengthComputable) return;
+        onProgress(Math.min(99, Math.round((ev.loaded / ev.total) * 100)));
+      };
+      xhr.onload = () => {
+        let body: { error?: string } = {};
+        try { body = JSON.parse(xhr.responseText || '{}'); } catch { body = {}; }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(body as {
+            files: Array<{ filename: string; originalName: string; size: number; path: string }>;
+            uploadDir: string;
+            count: number;
+          });
+          return;
+        }
+        reject(new Error(body.error || `Upload failed (${xhr.status})`));
+      };
+      xhr.onerror = () => reject(new Error('Upload failed. The API on port 3001 did not accept the files.'));
+      xhr.ontimeout = () => reject(new Error('Upload timed out. Try fewer or smaller files.'));
+      xhr.send(formData);
     });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
-      throw new Error(error.error || 'Upload failed');
-    }
-    return response.json();
   },
 
   // Build dataset JSON from uploaded audio files

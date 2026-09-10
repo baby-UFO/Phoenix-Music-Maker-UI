@@ -23,32 +23,45 @@ import { getStorageProvider } from '../services/storage/factory.js';
 const router = Router();
 
 // Auto-generate a song title from lyrics or style when none is provided
+function stamp(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function autoTitle(params: { title?: string; lyrics?: string; instrumental?: boolean; style?: string; songDescription?: string }): string {
   if (params.title?.trim()) return params.title.trim();
+
+  let base = '';
 
   // Try first meaningful lyric line (skip section markers like [verse], [chorus])
   if (!params.instrumental && params.lyrics) {
     for (const line of params.lyrics.split('\n')) {
       const t = line.trim();
       if (t && !/^\[.*\]$/.test(t)) {
-        return t.length > 40 ? t.slice(0, 40).trimEnd() + '…' : t;
+        base = t.length > 32 ? t.slice(0, 32).trimEnd() + '…' : t;
+        break;
       }
     }
   }
 
-  // Fall back to first 4 words of style or description
-  const source = params.style || params.songDescription || '';
-  if (source) {
-    const words = source.trim().split(/\s+/).slice(0, 4).join(' ');
-    return words.charAt(0).toUpperCase() + words.slice(1);
+  // Fall back to first few style/description words
+  if (!base) {
+    const source = params.style || params.songDescription || '';
+    if (source) {
+      const words = source.trim().split(/\s+/).slice(0, 4).join(' ');
+      base = words.charAt(0).toUpperCase() + words.slice(1);
+    }
   }
 
-  return 'Untitled';
+  if (!base) base = 'Track';
+  // Always stamp so successive gens with the same prompt are distinguishable
+  return `${base} · ${stamp()}`;
 }
 
 const audioUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max
   fileFilter: (_req, file, cb) => {
     const allowedTypes = [
       'audio/mpeg',

@@ -288,6 +288,10 @@ function AppContent() {
         setCurrentView('search');
       } else if (path === '/news') {
         setCurrentView('news');
+      } else if (path === '/training') {
+        setCurrentView('training');
+      } else if (path === '/training') {
+        setCurrentView('training');
       }
     };
 
@@ -1403,6 +1407,10 @@ function AppContent() {
               window.history.pushState({}, '', '/search');
             } else if (v === 'news') {
               window.history.pushState({}, '', '/news');
+            } else if (v === 'training') {
+              window.history.pushState({}, '', '/training');
+            } else if (v === 'training') {
+              window.history.pushState({}, '', '/training');
             }
             if (isMobile) setShowLeftSidebar(false);
           }}
