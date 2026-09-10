@@ -1387,25 +1387,17 @@ function AppContent() {
               />
             </div>
 
-            {/* Draggable divider — same muted pill grip as lyrics/style resize handles */}
+            {/* Draggable divider — invisible track, only the small muted pill (like lyrics/style) */}
             <div
               role="separator"
               aria-orientation="vertical"
               aria-label="Resize create panel"
               onMouseDown={handleCreatePanelResizeStart}
-              className={`
-                hidden md:flex flex-shrink-0 w-3 h-full cursor-col-resize z-20
-                items-center justify-center
-                group relative
-                ${isResizingCreatePanel ? 'bg-zinc-100 dark:bg-white/5' : 'bg-transparent hover:bg-zinc-100 dark:hover:bg-white/5'}
-                transition-colors
-              `}
+              className="hidden md:flex flex-shrink-0 w-2.5 h-full cursor-col-resize z-20 items-center justify-center bg-transparent"
             >
               <div
-                className={`w-1 h-8 rounded-full transition-colors ${
-                  isResizingCreatePanel
-                    ? 'bg-zinc-400 dark:bg-zinc-500'
-                    : 'bg-zinc-300 dark:bg-zinc-700 group-hover:bg-zinc-400 dark:group-hover:bg-zinc-500'
+                className={`w-1 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 transition-colors ${
+                  isResizingCreatePanel ? 'bg-zinc-400 dark:bg-zinc-500' : 'hover:bg-zinc-400 dark:hover:bg-zinc-500'
                 }`}
               />
             </div>
