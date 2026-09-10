@@ -1025,6 +1025,7 @@ function AppContent() {
         trackName: params.trackName,
         completeTrackClasses: params.completeTrackClasses,
         isFormatCaption: params.isFormatCaption,
+        ditModel: params.ditModel,
       }, token);
 
       beginPollingJob(job.jobId, tempId);
