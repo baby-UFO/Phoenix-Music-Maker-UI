@@ -1,10 +1,10 @@
 @echo off
-REM ACE-Step UI Complete Startup Script for Windows
-REM Starts ACE-Step API + Backend + Frontend
+REM Phoenix Music Maker Complete Startup Script for Windows
+REM Starts Phoenix Engine + Backend + Frontend
 setlocal
 
 echo ==================================
-echo   ACE-Step Complete Startup
+echo   Phoenix Music Maker Complete Startup
 echo ==================================
 echo.
 
@@ -64,8 +64,8 @@ echo ==================================
 echo.
 
 REM Start ACE-Step API in new window
-echo [1/3] Starting ACE-Step API server...
-start "ACE-Step API Server" cmd /k "cd /d "%ACESTEP_PATH%" && %API_COMMAND%"
+echo [1/3] Starting Phoenix Engine API server...
+start "Phoenix Engine API" cmd /k "cd /d "%ACESTEP_PATH%" && %API_COMMAND%"
 
 REM Wait for API to start
 echo Waiting for API to initialize...
@@ -73,7 +73,7 @@ timeout /t 5 /nobreak >nul
 
 REM Start backend in new window
 echo [2/3] Starting backend server...
-start "ACE-Step UI Backend" cmd /k "cd /d "%~dp0server" && npm run dev"
+start "Phoenix Music Maker Backend" cmd /k "cd /d "%~dp0server" && npm run dev"
 
 REM Wait for backend to start
 echo Waiting for backend to start...
@@ -81,7 +81,7 @@ timeout /t 3 /nobreak >nul
 
 REM Start frontend in new window
 echo [3/3] Starting frontend...
-start "ACE-Step UI Frontend" cmd /k "cd /d "%~dp0" && npm run dev"
+start "Phoenix Music Maker Frontend" cmd /k "cd /d "%~dp0" && npm run dev"
 
 REM Wait a moment
 timeout /t 2 /nobreak >nul
@@ -91,7 +91,7 @@ echo ==================================
 echo   All Services Running!
 echo ==================================
 echo.
-echo   ACE-Step API: http://localhost:8001
+echo   Phoenix Engine API: http://localhost:8001
 echo   Backend:      http://localhost:3001
 echo   Frontend:     http://localhost:3000
 echo.
