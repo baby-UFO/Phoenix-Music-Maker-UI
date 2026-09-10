@@ -180,7 +180,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const BUILTIN_CREATE_DEFAULTS: CreateSettings = {
     customMode: true,
     lyrics: "[verse]\nGrew up where the roads stay broke and the power blink\nTephra in the air, still I stay in the link\nThey said ain't no work out here, pack it up and leave\nThen the line went live and I started to breathe\n\nLaptop in the shade, moss on the screen\nClient on the call like where you even been\nJungle bruh, fiber running through the green\nObama signed the check, now the pipeline clean\n\n[chorus]\nObama brought the fiber to the jungle\nNow I'm booking gigs, no more struggle\n808 slide, bass start to rumble\nDrop hit hard, whole canopy crumble\n\nGetting gigs in the jungle, yeah I'm on\nRemote from the vines, still get it gone\nFiber in the dirt, signal never wrong\nDrill in the mix when the wobble come on\n\n[drop]\n\n[verse]\nThey paved the park roads, left the residents last\nI stayed in the cut, let the signal hold fast\nGenerator kick, solar on the roof\nFiber in the ground, that's the real living proof\n\nGigs in the morning, gigs when the sun go down\nJungle don't sleep and neither do the sound\nDubstep in the chest, drill in the flow\nWhole island shaking when the drop let go\n\n[chorus]\nObama brought the fiber to the jungle\nNow I'm booking gigs, no more struggle\n808 slide, bass start to rumble\nDrop hit hard, whole canopy crumble\n\n[Instrumental Break]\n[Shouted]\nGicks in the jungle!\n\n[Outro]\n[Beat fades out, leaving synth pads and bass]\n[Final distorted synth note fades]",
-    style: "James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature oratorical delivery, rumbling low register, no tenor (~170 Hz+), no light pop tenor, babyUFO style, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive",
+    style: "James Earl Jones-like basso profondo male voice (NOT baritone): speaking F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature oratorical delivery, thick low harmonics, slow deliberate pacing, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange, babyUFO style, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive",
     title: "gigs3",
     instrumental: false,
     vocalLanguage: 'en',
@@ -205,7 +205,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     lmCfgScale: 2.2,
     lmTopK: 0,
     lmTopP: 0.92,
-    lmNegativePrompt: 'NO USER INPUT',
+    lmNegativePrompt: 'no baritone, no tenor, no bright pop male vocals, no high chest mix, no thin midrange voice',
     instruction: 'Fill the audio semantic mask based on the given conditions:',
     audioCoverStrength: 1.0,
     taskType: 'text2music',
@@ -1252,7 +1252,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         return promoteVocalFront(trimmed);
       }
       const genderHint = vocalGender === 'male'
-        ? 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature oratorical delivery, rumbling low register, no tenor (~170 Hz+), no light pop tenor'
+        ? 'James Earl Jones-like basso profondo male voice (NOT baritone): speaking F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature oratorical delivery, thick low harmonics, slow deliberate pacing, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange'
         : 'female vocals';
       // Don't stack a weak "Male vocals" if the style already describes the voice
       if (hasVocalDetail) return promoteVocalFront(trimmed);
@@ -1492,7 +1492,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                             </span>
                             {fetchedModels.find(m => m.name === model.id)?.is_preloaded && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                {fetchedModels.find(m => m.name === model.id)?.is_active ? 'â— Active' : 'â— Ready'}
+                                {fetchedModels.find(m => m.name === model.id)?.is_active ? 'Ã¢â€”Â Active' : 'Ã¢â€”Â Ready'}
                               </span>
                             )}
                           </div>
@@ -2514,7 +2514,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 <button
                   type="button"
                   onClick={() => {
-                    // Convert source audio to LM codes â€” requires Gradio lambda (not exposed as API)
+                    // Convert source audio to LM codes Ã¢â‚¬â€ requires Gradio lambda (not exposed as API)
                     // This is a placeholder: Gradio's convert_src_audio_to_codes_wrapper is not a named endpoint
                     console.log('Convert to Codes: requires source audio upload. Use Gradio UI for this feature.');
                   }}
@@ -2527,7 +2527,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 <button
                   type="button"
                   onClick={() => {
-                    // Transcribe audio codes to metadata â€” requires Gradio lambda (not exposed as API)
+                    // Transcribe audio codes to metadata Ã¢â‚¬â€ requires Gradio lambda (not exposed as API)
                     console.log('Transcribe: requires audio codes. Use Gradio UI for this feature.');
                   }}
                   disabled={!audioCodes.trim()}
