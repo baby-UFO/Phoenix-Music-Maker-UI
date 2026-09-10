@@ -6,6 +6,7 @@ import { useI18n } from '../context/I18nContext';
 import { generateApi } from '../services/api';
 import { MAIN_STYLES } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
+import { lsGet, lsSet, storageKeys } from '../utils/phoenixStorage';
 
 interface ReferenceTrack {
   id: string;
@@ -121,7 +122,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const { t } = useI18n();
 
   // ---- Persisted Create defaults (survive hard refresh) ----
-  const CREATE_SETTINGS_KEY = 'ace-create-settings-v3c';
+  const CREATE_SETTINGS_KEY = storageKeys.createSettings.primary;
+const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   type CreateSettings = {
     customMode?: boolean;
     songDescription?: string;
@@ -222,19 +224,19 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     lmBatchChunkSize: 8,
     isFormatCaption: false,
     showLoraPanel: true,
-    loraPath: 'E:\ACE-Step-1.5\lora_output_v3b\final\adapter',
+    loraPath: 'E:\Phoenix-Engine\lora_output_v3b\final\adapter',
     loraEnabled: true,
     loraScale: 1.0,
   };
 
   const loadCreateSettings = (): CreateSettings => {
     try {
-      const raw = localStorage.getItem(CREATE_SETTINGS_KEY);
+      const raw = lsGet(CREATE_SETTINGS_KEY, CREATE_SETTINGS_LEGACY);
       if (!raw) return { ...BUILTIN_CREATE_DEFAULTS };
       const parsed = { ...BUILTIN_CREATE_DEFAULTS, ...JSON.parse(raw) } as CreateSettings;
       // Always prefer the v2 style adapter if saved path is missing/old
       const bad = !parsed.loraPath || /lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v3b/.test(parsed.loraPath);
-      if (bad) parsed.loraPath = 'E:\\ACE-Step-1.5\\lora_output_v3b\\final\\adapter';
+      if (bad) parsed.loraPath = 'E:\\Phoenix-Engine\\lora_output_v3b\\final\\adapter';
       return parsed;
     } catch {
       return { ...BUILTIN_CREATE_DEFAULTS };
@@ -284,11 +286,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(cs('showAdvanced', true));
   const [duration, setDuration] = useState(cs('duration', 234));
   const [batchSize, setBatchSize] = useState(() => {
-    const stored = localStorage.getItem('ace-batchSize');
+    const stored = lsGet(storageKeys.batchSize.primary, storageKeys.batchSize.legacy);
     return stored ? Number(stored) : 1;
   });
   const [bulkCount, setBulkCount] = useState(() => {
-    const stored = localStorage.getItem('ace-bulkCount');
+    const stored = lsGet(storageKeys.bulkCount.primary, storageKeys.bulkCount.legacy);
     return stored ? Number(stored) : 1;
   });
   const [guidanceScale, setGuidanceScale] = useState(cs('guidanceScale', 10.5));
@@ -301,7 +303,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(cs('inferMethod', 'sde'));
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>(cs('lmBackend', 'vllm'));
   const [lmModel, setLmModel] = useState(() => {
-    return localStorage.getItem('ace-lmModel') || 'acestep-5Hz-lm-4B';
+    return lsGet(storageKeys.lmModel.primary, storageKeys.lmModel.legacy) || 'acestep-5Hz-lm-4B';
   });
   const [shift, setShift] = useState(cs('shift', 3.0));
 
@@ -346,7 +348,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // LoRA Parameters
   const [showLoraPanel, setShowLoraPanel] = useState(cs('showLoraPanel', true));
-  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\ACE-Step-1.5\lora_output_v3b\final\adapter'));
+  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\Phoenix-Engine\lora_output_v3b\final\adapter'));
   const [loraLoaded, setLoraLoaded] = useState(false);
   const [loraEnabled, setLoraEnabled] = useState(cs('loraEnabled', true));
   const [loraScale, setLoraScale] = useState(cs('loraScale', 1.0));
@@ -365,10 +367,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       isFormatCaption, showLoraPanel, loraPath, loraEnabled, loraScale,
     };
     try {
-      localStorage.setItem(CREATE_SETTINGS_KEY, JSON.stringify(payload));
-      localStorage.setItem('ace-lmModel', lmModel);
-      localStorage.setItem('ace-batchSize', String(batchSize));
-      localStorage.setItem('ace-bulkCount', String(bulkCount));
+      lsSet(CREATE_SETTINGS_KEY, JSON.stringify(payload), CREATE_SETTINGS_LEGACY);
+      lsSet(storageKeys.lmModel.primary, lmModel, storageKeys.lmModel.legacy);
+      lsSet(storageKeys.batchSize.primary, String(batchSize), storageKeys.batchSize.legacy);
+      lsSet(storageKeys.bulkCount.primary, String(bulkCount), storageKeys.bulkCount.legacy);
     } catch {
       // ignore quota / private mode
     }
@@ -384,7 +386,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return localStorage.getItem('ace-model') || 'acestep-v15-turbo-shift3';
+    return lsGet(storageKeys.model.primary, storageKeys.model.legacy) || 'acestep-v15-turbo-shift3';
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -488,7 +490,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Resize Logic
   const [lyricsHeight, setLyricsHeight] = useState(() => {
-    const saved = localStorage.getItem('acestep_lyrics_height');
+    const saved = lsGet(storageKeys.lyricsHeight.primary, storageKeys.lyricsHeight.legacy);
     return saved ? parseInt(saved, 10) : 144; // Default h-36 is 144px (9rem * 16)
   });
   const [isResizing, setIsResizing] = useState(false);
@@ -727,7 +729,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       document.body.style.cursor = 'default';
       document.body.style.userSelect = 'auto';
       // Save height to localStorage
-      localStorage.setItem('acestep_lyrics_height', String(lyricsHeight));
+      lsSet(storageKeys.lyricsHeight.primary, String(lyricsHeight), storageKeys.lyricsHeight.legacy);
     };
 
     if (isResizing) {
@@ -757,7 +759,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           const active = models.find((m: any) => m.is_active);
           if (active) {
             setSelectedModel(active.name);
-            localStorage.setItem('ace-model', active.name);
+            lsSet(storageKeys.model.primary, active.name, storageKeys.model.legacy);
           }
         }
       }
@@ -1394,7 +1396,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                         key={model.id}
                         onClick={() => {
                           setSelectedModel(model.id);
-                          localStorage.setItem('ace-model', model.id);
+                          lsSet(storageKeys.model.primary, model.id, storageKeys.model.legacy);
                           // Auto-adjust parameters for non-turbo models
                           if (!isTurboModel(model.id)) {
                             setInferenceSteps(20);
@@ -2173,7 +2175,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 {[1, 2, 3, 5, 10].map((count) => (
                   <button
                     key={count}
-                    onClick={() => { setBulkCount(count); localStorage.setItem('ace-bulkCount', String(count)); }}
+                    onClick={() => { setBulkCount(count); lsSet(storageKeys.bulkCount.primary, String(count), storageKeys.bulkCount.legacy); }}
                     className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                       bulkCount === count
                         ? 'bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-md'
@@ -2257,7 +2259,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('lmModelLabel')}</label>
               <select
                 value={lmModel}
-                onChange={(e) => { const v = e.target.value; setLmModel(v); localStorage.setItem('ace-lmModel', v); }}
+                onChange={(e) => { const v = e.target.value; setLmModel(v); lsSet(storageKeys.lmModel.primary, v, storageKeys.lmModel.legacy); }}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
               >
                 <option value="acestep-5Hz-lm-0.6B">{t('lmModel06B')}</option>

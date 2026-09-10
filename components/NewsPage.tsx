@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Newspaper, X, Star, Github } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
 import newsData from '../data/news.json';
+import { lsGet, lsSet, storageKeys } from '../utils/phoenixStorage';
 
 interface NewsItem {
   id: string;
@@ -15,7 +16,7 @@ export const NewsPage: React.FC = () => {
   const { t } = useI18n();
   const [dismissedNews, setDismissedNews] = useState<Set<string>>(() => {
     try {
-      const stored = localStorage.getItem('ace-dismissed-news');
+      const stored = lsGet(storageKeys.dismissedNews.primary, storageKeys.dismissedNews.legacy);
       return stored ? new Set(JSON.parse(stored)) : new Set();
     } catch {
       return new Set();
@@ -30,7 +31,7 @@ export const NewsPage: React.FC = () => {
     setDismissedNews(prev => {
       const next = new Set(prev);
       next.add(id);
-      localStorage.setItem('ace-dismissed-news', JSON.stringify([...next]));
+      lsSet(storageKeys.dismissedNews.primary, JSON.stringify([...next]), storageKeys.dismissedNews.legacy);
       return next;
     });
   };
@@ -39,7 +40,7 @@ export const NewsPage: React.FC = () => {
     setDismissedNews(prev => {
       const next = new Set(prev);
       next.delete(id);
-      localStorage.setItem('ace-dismissed-news', JSON.stringify([...next]));
+      lsSet(storageKeys.dismissedNews.primary, JSON.stringify([...next]), storageKeys.dismissedNews.legacy);
       return next;
     });
   };

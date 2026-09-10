@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { authApi, User } from '../services/api';
+import { lsSet, lsRemove, storageKeys } from '../utils/phoenixStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -14,8 +15,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = 'acestep_token';
-const USER_KEY = 'acestep_user';
+const TOKEN_KEY = storageKeys.token.primary;
+const TOKEN_LEGACY = storageKeys.token.legacy;
+const USER_KEY = storageKeys.user.primary;
+const USER_LEGACY = storageKeys.user.legacy;
 
 export function AuthProvider({ children }: { children: ReactNode }): React.ReactElement {
   // Start with null - we'll auto-login from database on mount
@@ -33,8 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
         const { user: userData, token: newToken } = await authApi.auto();
         setUser(userData);
         setToken(newToken);
-        localStorage.setItem(TOKEN_KEY, newToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(userData));
+        lsSet(TOKEN_KEY, newToken, TOKEN_LEGACY);
+        lsSet(USER_KEY, JSON.stringify(userData), USER_LEGACY);
       } catch (error: unknown) {
         // No user in database (404) or server error - that's okay
         // Clear any stale localStorage data
@@ -48,8 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
         // Clear stale data
         setToken(null);
         setUser(null);
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
+        lsRemove(TOKEN_KEY, TOKEN_LEGACY);
+        lsRemove(USER_KEY, USER_LEGACY);
       } finally {
         setIsLoading(false);
       }
@@ -62,8 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     const { user: userData, token: newToken } = await authApi.setup(username);
     setUser(userData);
     setToken(newToken);
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
+    lsSet(TOKEN_KEY, newToken, TOKEN_LEGACY);
+    lsSet(USER_KEY, JSON.stringify(userData), USER_LEGACY);
   }, []);
 
   const updateUsername = useCallback(async (username: string): Promise<void> => {
@@ -71,16 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     const { user: userData, token: newToken } = await authApi.updateUsername(username, token);
     setUser(userData);
     setToken(newToken);
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
+    lsSet(TOKEN_KEY, newToken, TOKEN_LEGACY);
+    lsSet(USER_KEY, JSON.stringify(userData), USER_LEGACY);
   }, [token]);
 
   const logout = useCallback((): void => {
     authApi.logout().catch(() => {});
     setUser(null);
     setToken(null);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    lsRemove(TOKEN_KEY, TOKEN_LEGACY);
+    lsRemove(USER_KEY, USER_LEGACY);
   }, []);
 
   const refreshUser = useCallback(async (): Promise<void> => {
@@ -88,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     try {
       const { user: userData } = await authApi.me(token);
       setUser(userData);
-      localStorage.setItem(USER_KEY, JSON.stringify(userData));
+      lsSet(USER_KEY, JSON.stringify(userData), USER_LEGACY);
     } catch (error) {
       console.error('Failed to refresh user:', error);
     }
