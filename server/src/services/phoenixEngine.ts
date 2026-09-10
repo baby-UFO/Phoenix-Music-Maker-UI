@@ -346,7 +346,9 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     params.useAdg ?? false,                                       // 21: Use ADG
     params.cfgIntervalStart ?? 0.0,                               // 22: CFG Interval Start
     params.cfgIntervalEnd ?? 1.0,                                 // 23: CFG Interval End
-    params.shift ?? 3.0,                                          // 24: Shift
+    (params.shift != null
+      ? params.shift
+      : (params.ditModel && /turbo/i.test(params.ditModel) ? 3.0 : 1.0)), // 24: Shift (base/sft default 1.0)
     params.inferMethod || 'ode',                                  // 25: Inference Method
     params.customTimesteps || '',                                 // 26: Custom Timesteps
     params.audioFormat || 'mp3',                                  // 27: Audio Format
@@ -359,7 +361,8 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     wantCotMetas,                                                 // 34: CoT Metas
     wantCotCaption,                                               // 35: CaptionRewrite
     wantCotLanguage,                                              // 36: CoT Language
-    params.constrainedDecodingDebug ?? false,                     // 37: Constrained Decoding Debug
+    // API omits State (is_format_caption_state); do not insert it in predict() args
+    params.constrainedDecodingDebug ?? false,                     // 37: Constrained Decoding Debug (API)
     params.allowLmBatch ?? true,                                  // 38: ParallelThinking
     params.getScores ?? false,                                    // 39: Auto Score
     params.getLrc ?? false,                                       // 40: Auto LRC
@@ -796,7 +799,32 @@ async function processGenerationViaGradio(
     prompt: (args[0] as string)?.slice?.(0, 80) ?? prompt.slice(0, 50),
     duration: params.duration,
     batchSize: params.batchSize,
+    ditModel: params.ditModel,
+    inferenceStepsParam: params.inferenceSteps,
+    args6_ditSteps: args[6],
+    args24_shift: args[24],
+    args25_inferMethod: args[25],
+    args26_customTimesteps: args[26],
   });
+  try {
+    const fs = await import('fs');
+    fs.appendFileSync(
+      'E:/ace-step/server/dit-steps-debug.log',
+      JSON.stringify({
+        t: new Date().toISOString(),
+        phase: 'pre-predict',
+        jobId,
+        ditModel: params.ditModel,
+        inferenceStepsParam: params.inferenceSteps,
+        args6_ditSteps: args[6],
+        args24_shift: args[24],
+        args25_inferMethod: args[25],
+        args26_customTimesteps: args[26],
+        duration: params.duration,
+        argsLength: args.length,
+      }) + '\n',
+    );
+  } catch { /* ignore */ }
 
   job.stage = 'Generating music via Gradio...';
 
@@ -817,6 +845,22 @@ async function processGenerationViaGradio(
   const allFiles = data[8]; // list of file objects
   const genDetails = data[9] as string | undefined;
   const genStatus = data[10] as string | undefined;
+  try {
+    const fs = await import('fs');
+    fs.appendFileSync(
+      'E:/ace-step/server/dit-steps-debug.log',
+      JSON.stringify({
+        t: new Date().toISOString(),
+        phase: 'post-predict',
+        jobId,
+        ditModel: params.ditModel,
+        inferenceStepsParam: params.inferenceSteps,
+        args6_ditSteps: args[6],
+        genStatus: typeof genStatus === 'string' ? genStatus.slice(0, 500) : genStatus,
+        genDetails: typeof genDetails === 'string' ? genDetails.slice(0, 1500) : genDetails,
+      }) + '\n',
+    );
+  } catch { /* ignore */ }
 
   // Collect audio file objects — prefer the "All Generated Files" list
   let audioFileObjects: Array<{ url?: string; path?: string; orig_name?: string }> = [];

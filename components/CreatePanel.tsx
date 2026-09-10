@@ -145,6 +145,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     enhance?: boolean;
     audioFormat?: 'mp3' | 'flac';
     inferenceSteps?: number;
+  qualityPreset?: 'fast' | 'quality' | 'max' | null;
     inferMethod?: 'ode' | 'sde';
     lmBackend?: 'pt' | 'vllm';
     shift?: number;
@@ -196,7 +197,8 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     thinking: false,
     enhance: true,
     audioFormat: 'flac',
-    inferenceSteps: 200,
+    inferenceSteps: 100,
+  qualityPreset: 'quality',
     inferMethod: 'sde',
     lmBackend: 'vllm',
     shift: 3.0,
@@ -428,13 +430,13 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [thinking, setThinking] = useState(cs('thinking', false)); // BPM path may still force Think server-side
   const [enhance, setEnhance] = useState(cs('enhance', true));
   const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>(cs('audioFormat', 'flac'));
-  const [inferenceSteps, setInferenceSteps] = useState(cs('inferenceSteps', 200));
+  const [inferenceSteps, setInferenceSteps] = useState(cs('inferenceSteps', 100));
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(cs('inferMethod', 'sde'));
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>(cs('lmBackend', 'vllm'));
   const [lmModel, setLmModel] = useState(() => {
     return lsGet(storageKeys.lmModel.primary, storageKeys.lmModel.legacy) || 'acestep-5Hz-lm-4B';
   });
-  const [shift, setShift] = useState(cs('shift', 3.0));
+  const [shift, setShift] = useState(cs('shift', 1.0));
 
   // LM Parameters (under Expert)
   const [showLmParams, setShowLmParams] = useState(cs('showLmParams', true));
@@ -489,7 +491,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     const payload: CreateSettings = {
       customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender,
       bpm, keyScale, timeSignature, showAdvanced, duration, guidanceScale, randomSeed, seed,
-      thinking, enhance, audioFormat, inferenceSteps, inferMethod, lmBackend, shift, showLmParams,
+      thinking, enhance, audioFormat, inferenceSteps, qualityPreset, inferMethod, lmBackend, shift, showLmParams,
       lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, instruction, audioCoverStrength,
       taskType, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption,
       useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize,
@@ -506,7 +508,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   }, [
     customMode, songDescription, lyrics, style, title, instrumental, vocalLanguage, vocalGender,
     bpm, keyScale, timeSignature, showAdvanced, duration, guidanceScale, randomSeed, seed,
-    thinking, enhance, audioFormat, inferenceSteps, inferMethod, lmBackend, lmModel, shift, showLmParams,
+    thinking, enhance, audioFormat, inferenceSteps, qualityPreset, inferMethod, lmBackend, lmModel, shift, showLmParams,
     lmTemperature, lmCfgScale, lmTopK, lmTopP, lmNegativePrompt, instruction, audioCoverStrength,
     taskType, useAdg, cfgIntervalStart, cfgIntervalEnd, customTimesteps, useCotMetas, useCotCaption,
     useCotLanguage, autogen, allowLmBatch, getScores, getLrc, scoreScale, lmBatchChunkSize,
@@ -523,6 +525,49 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   
   // Available models fetched from backend
   const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
+  const [qualityPreset, setQualityPreset] = useState<'fast' | 'quality' | 'max' | null>(() => {
+    const s = (cs('qualityPreset', 'quality') as string) || 'quality';
+    return s === 'fast' || s === 'quality' || s === 'max' ? s : 'quality';
+  });
+  const [engineBootModel, setEngineBootModel] = useState<string | null>(null);
+
+  const persistModel = useCallback((modelId: string) => {
+    setSelectedModel(modelId);
+    lsSet(storageKeys.model.primary, modelId, storageKeys.model.legacy);
+  }, []);
+
+  const applyQualityPreset = useCallback((preset: 'fast' | 'quality' | 'max') => {
+    setQualityPreset(preset);
+    // Persist via create-settings effect (qualityPreset in payload) + direct key
+    try { localStorage.setItem('ace-create-qualityPreset', preset); } catch { /* ignore */ }
+
+    const hasSft = fetchedModels.some((m) => m.name === 'acestep-v15-sft' && m.is_preloaded);
+    const turboId =
+      fetchedModels.find((m) => m.name === 'acestep-v15-turbo' && m.is_preloaded)?.name
+      || fetchedModels.find((m) => /turbo/i.test(m.name) && m.is_preloaded)?.name
+      || 'acestep-v15-turbo';
+
+    if (preset === 'fast') {
+      persistModel(turboId);
+      setInferenceSteps(8);
+      setInferMethod('ode');
+      setShift(3.0);
+      setUseAdg(false);
+    } else if (preset === 'quality') {
+      persistModel('acestep-v15-base');
+      setInferenceSteps(100);
+      setInferMethod('sde');
+      setShift(1.0);
+      setUseAdg(true);
+    } else {
+      persistModel(hasSft ? 'acestep-v15-sft' : 'acestep-v15-base');
+      setInferenceSteps(200);
+      setInferMethod('sde');
+      setShift(1.0);
+      setUseAdg(true);
+    }
+  }, [fetchedModels, persistModel]);
+
 
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
@@ -950,6 +995,13 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         const models = data.models || [];
         if (models.length > 0) {
           setFetchedModels(models);
+          if (data.bootModel || data.boot_model) {
+            setEngineBootModel(data.bootModel || data.boot_model);
+          } else {
+            const active = models.find((m: any) => m.is_active)?.name || models.find((m: any) => m.is_preloaded && !/turbo/i.test(m.name))?.name || null;
+            // Prefer server-reported boot; fallback stays null until API adds bootModel
+            if (data.engineConfigPath) setEngineBootModel(data.engineConfigPath);
+          }
           // Prefer non-turbo when high steps requested. Don't blindly force engine "active" turbo.
           const saved = lsGet(storageKeys.model.primary, storageKeys.model.legacy);
           const preferBase = models.find((m: any) => m.name === 'acestep-v15-base')
@@ -2237,6 +2289,42 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                     </button>
                   ))}
                 </div>
+                {/* Quality presets: Fast / Quality / Max (pairs DiT model + steps + method/shift) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Quality</span>
+                  {(
+                    [
+                      { id: 'fast' as const, label: 'Fast', hint: 'turbo · 8 · ode' },
+                      { id: 'quality' as const, label: 'Quality', hint: 'base · 100 · sde' },
+                      { id: 'max' as const, label: 'Max', hint: 'sft/base · 200 · sde' },
+                    ]
+                  ).map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      title={preset.hint}
+                      onClick={() => applyQualityPreset(preset.id)}
+                      className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors border ${
+                        qualityPreset === preset.id
+                          ? 'bg-emerald-600 text-white border-emerald-500'
+                          : 'bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-zinc-200 dark:border-white/5'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                {engineBootModel && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-snug">
+                    Engine boot model: <span className="font-semibold">{engineBootModel}</span>
+                    {" — "}DiT checkpoint is fixed at engine start (no live hot-swap). Fast/turbo needs a turbo boot; Quality/Max use base/sft with high steps on the current engine.
+                  </p>
+                )}
+                {!engineBootModel && (
+                  <p className="text-[10px] text-zinc-500 leading-snug">
+                    Quality/Max set base (or sft) + high DiT steps. Fast selects turbo in the UI, but the engine only runs turbo if started with that checkpoint (start-all defaults to base).
+                  </p>
+                )}
                 {/* Quick Tags */}
                 <div className="flex flex-wrap gap-2">
                   {musicTags.map(tag => (
@@ -2570,7 +2658,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               </p>
             ) : (
               <p className="text-[10px] text-zinc-500 -mt-1">
-                Non-turbo DiT: up to 200 inference steps (not limited by the turbo clamp).
+                Non-turbo DiT: up to 200 inference steps. Quality=100 / Max=200 presets pair model+steps so high settings cannot silently stay on turbo.
               </p>
             )}
 

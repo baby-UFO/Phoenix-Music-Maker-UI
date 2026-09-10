@@ -685,7 +685,11 @@ router.get('/models', async (_req, res: Response) => {
       const modelPath = path.join(checkpointsDir, model);
       try {
         if (existsSync(modelPath) && statSync(modelPath).isDirectory()) {
-          downloaded.add(model);
+          // Require weights so a partial HF download folder is not treated as ready
+          const weights = path.join(modelPath, 'model.safetensors');
+          if (existsSync(weights) && statSync(weights).isFile() && statSync(weights).size > 1_000_000) {
+            downloaded.add(model);
+          }
         }
       } catch { /* skip */ }
     }
@@ -717,7 +721,42 @@ router.get('/models', async (_req, res: Response) => {
       return a.name.localeCompare(b.name);
     });
 
-    res.json({ models });
+    // Boot checkpoint from env / start-all (runtime /v1/init is 404 on this Gradio build)
+    const bootModel =
+      process.env.ACESTEP_CONFIG_PATH ||
+      process.env.PHOENIX_ENGINE_CONFIG_PATH ||
+      null;
+
+    // Best-effort: detect running engine --config_path from a sibling status file if present
+    let engineConfigPath: string | null = bootModel;
+    try {
+      const { readFileSync } = await import('fs');
+      const statusPath = path.join(PHOENIX_ENGINE_DIR, 'phoenix-engine-status.json');
+      if (existsSync(statusPath)) {
+        const st = JSON.parse(readFileSync(statusPath, 'utf8'));
+        if (st?.config_path) engineConfigPath = String(st.config_path);
+      }
+    } catch { /* optional */ }
+
+    // Prefer activeModel from Gradio when available; else boot path
+    if (!activeModel && engineConfigPath) {
+      activeModel = engineConfigPath;
+      for (const m of models) {
+        m.is_active = m.name === activeModel;
+      }
+      models.sort((a, b) => {
+        if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+        if (a.is_preloaded !== b.is_preloaded) return a.is_preloaded ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    res.json({
+      models,
+      bootModel: engineConfigPath,
+      engineConfigPath,
+      note: 'DiT checkpoint is selected at engine boot via --config_path. /v1/init hot-swap is not available on this build.',
+    });
   } catch (error) {
     console.error('Models error:', error);
     res.status(500).json({ error: (error as Error).message });
