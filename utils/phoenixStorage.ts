@@ -42,6 +42,7 @@ export const storageKeys = {
   bulkCount: { primary: "phoenix-bulkCount", legacy: "ace-bulkCount" },
   lyricsHeight: { primary: "phoenix_lyrics_height", legacy: "acestep_lyrics_height" },
   styleHeight: { primary: "phoenix_style_height", legacy: "ace_style_height" },
+  titleVersion: { primary: "phoenix_title_version", legacy: "ace_title_version" },
   dismissedNews: { primary: "phoenix-dismissed-news", legacy: "ace-dismissed-news" },
   createSettings: { primary: "phoenix-create-settings-v3c", legacy: "ace-create-settings-v3c" },
 } as const;

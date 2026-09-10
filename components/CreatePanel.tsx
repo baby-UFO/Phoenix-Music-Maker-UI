@@ -510,6 +510,38 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [isResizingStyle, setIsResizingStyle] = useState(false);
   const styleRef = useRef<HTMLDivElement>(null);
 
+  // Version titles: "Name" -> Name-1, Name-2, ... until the title field changes
+  type TitleVersionState = { base: string; next: number };
+  const loadTitleVersion = (): TitleVersionState => {
+    try {
+      const raw = lsGet(storageKeys.titleVersion.primary, storageKeys.titleVersion.legacy);
+      if (raw) {
+        const parsed = JSON.parse(raw) as TitleVersionState;
+        if (parsed && typeof parsed.base === 'string' && typeof parsed.next === 'number') return parsed;
+      }
+    } catch { /* ignore */ }
+    return { base: '', next: 1 };
+  };
+  const titleVersionRef = useRef<TitleVersionState>(loadTitleVersion());
+
+  const persistTitleVersion = (state: TitleVersionState) => {
+    titleVersionRef.current = state;
+    lsSet(storageKeys.titleVersion.primary, JSON.stringify(state), storageKeys.titleVersion.legacy);
+  };
+
+  const allocateVersionedTitle = (rawTitle: string, styleFallback: string, count = 1): string => {
+    const base = rawTitle.trim()
+      || (styleFallback.trim().split(/\s+/).slice(0, 4).join(' ') || 'Track');
+    let state = titleVersionRef.current;
+    if (base !== state.base) {
+      state = { base, next: 1 };
+    }
+    const n = state.next;
+    const take = Math.max(1, count);
+    persistTitleVersion({ base, next: n + take });
+    return `${base}-${n}`;
+  };
+
 
   // Close model menu when clicking outside
   useEffect(() => {
@@ -1267,15 +1299,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         prompt: lyrics,
         lyrics,
         style: styleWithGender,
-        title: (() => {
-          const pad = (n: number) => String(n).padStart(2, '0');
-          const d = new Date();
-          const stamp = `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-          const base = title.trim()
-            || (styleWithGender.trim().split(/\s+/).slice(0, 4).join(' ') || 'Track');
-          const named = title.trim() ? base : `${base} Â· ${stamp}`;
-          return bulkCount > 1 ? `${named} (${i + 1})` : named;
-        })(),
+        title: allocateVersionedTitle(title, styleWithGender, batchSize),
         ditModel: selectedModel,
         instrumental,
         vocalLanguage,
@@ -1965,7 +1989,14 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setTitle(next);
+                  const trimmed = next.trim();
+                  if (trimmed && trimmed !== titleVersionRef.current.base) {
+                    persistTitleVersion({ base: trimmed, next: 1 });
+                  }
+                }}
                 placeholder={t('nameSong')}
                 className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
               />

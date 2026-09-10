@@ -59,6 +59,41 @@ function autoTitle(params: { title?: string; lyrics?: string; instrumental?: boo
   return `${base} · ${stamp()}`;
 }
 
+
+async function allocateVersionedSongTitles(userId: string, requestedTitle: string, count: number): Promise<string[]> {
+  const raw = (requestedTitle || '').trim();
+  if (!raw) {
+    return Array.from({ length: count }, (_, i) => `Track · ${stamp()}${count > 1 ? `-${i + 1}` : ''}`);
+  }
+
+  // Client may already send "Name-3". Trust that stem/number and continue the sequence for batches.
+  const peeled = raw.match(/^(.*)-(\d+)$/);
+  if (peeled) {
+    const stem = peeled[1];
+    const startNum = parseInt(peeled[2], 10);
+    return Array.from({ length: count }, (_, i) => `${stem}-${startNum + i}`);
+  }
+
+  const like = raw.replace(/[%_]/g, '') + '-%';
+  const result = await pool.query(
+    `SELECT title FROM songs WHERE user_id = ? AND (title = ? OR title LIKE ?)`,
+    [userId, raw, like]
+  );
+  const rows = (result.rows || []) as { title: string }[];
+  const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^${escaped}-(\\d+)$`);
+  let max = 0;
+  let sawBare = false;
+  for (const row of rows) {
+    if (row.title === raw) sawBare = true;
+    const m = row.title.match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  if (sawBare && max < 1) max = 0;
+
+  return Array.from({ length: count }, (_, i) => `${raw}-${max + 1 + i}`);
+}
+
 const audioUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max
@@ -431,10 +466,11 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
             const localPaths: string[] = [];
             const storage = getStorageProvider();
 
+            const baseTitle = autoTitle(params);
+            const versionedTitles = await allocateVersionedSongTitles(req.user!.id, baseTitle, audioUrls.length);
             for (let i = 0; i < audioUrls.length; i++) {
               const audioUrl = audioUrls[i];
-              const variationSuffix = audioUrls.length > 1 ? ` (v${i + 1})` : '';
-              const songTitle = autoTitle(params) + variationSuffix;
+              const songTitle = versionedTitles[i];
 
               const songId = generateUUID();
 
