@@ -140,14 +140,31 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
 
   // Voice descriptions get buried after genre tags and then ignored. Lead with them.
   // Also strip stacked bare "Male vocals" lines from the UI gender toggle.
+  // When rap/drill: RAP delivery clauses BEFORE basso/JEJ timbre (celebrity-actor lead biases hummed theater).
+  const RAP_RE = /\b(rap|rapping|rapper|drill|trap|hip[- ]?hop|grime|boom[- ]?bap)\b/i;
+  const RAP_DELIVERY_RE = /\b(rhythmic rapped|rapped delivery|aggressive spit|tight syllabic|rap vocals|one syllable per beat|no singing|no humming|no melisma|no arabic melismatic|no wordless vocal)\b/i;
+  const TIMBRE_RE = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered|james earl jones|speaking f0|speaking fundamental|jej-depth|rapped-pitch)\b/i;
   const promoteVocals = (text: string): string => {
     if (!text) return text;
     const parts = text.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
-    const vocalRe = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered|rapped delivery|rhythmic rapped)\b/i;
+    const wantsRapLocal = RAP_RE.test(text);
+    const vocalRe = wantsRapLocal
+      ? new RegExp(RAP_DELIVERY_RE.source + '|' + TIMBRE_RE.source, 'i')
+      : /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered|rapped delivery|rhythmic rapped)\b/i;
     const vocal = parts.filter((p) => vocalRe.test(p));
     const other = parts.filter((p) => !vocalRe.test(p));
-    const rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
-    const useVocal = rich.length ? rich : vocal;
+    let rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
+    const hasDeepBass = rich.some((p) => /\b(basso|profondo|bass voice|bass vocals?|james earl jones)\b/i.test(p));
+    if (hasDeepBass) {
+      rich = rich.filter((p) => !/\bbaritone\b/i.test(p));
+    }
+    let useVocal = rich.length ? rich : vocal;
+    // Rap must lead: delivery / anti-sung before JEJ/basso timbre clauses
+    if (wantsRapLocal && useVocal.length > 1) {
+      const rapParts = useVocal.filter((p) => RAP_DELIVERY_RE.test(p));
+      const timbreParts = useVocal.filter((p) => !RAP_DELIVERY_RE.test(p));
+      useVocal = [...rapParts, ...timbreParts];
+    }
     const seen = new Set<string>();
     const out: string[] = [];
     for (const p of [...useVocal, ...other]) {
@@ -160,49 +177,84 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   };
   prompt = promoteVocals(prompt);
 
-  const wantsRap = /\b(rap|rapping|rapper|drill|trap|hip[- ]?hop|grime|boom[- ]?bap)\b/i.test(prompt);
+  const wantsRap = RAP_RE.test(prompt);
   if (wantsRap) {
-    // Rewrite toxic oratorical / slow-sung cues that outrank "rap" in the conditioner
+    // Strip speaking/oratorical cues + orphan tenor-Hz fragments that look like positive pitch targets
     prompt = prompt
-      .replace(/\bgravelly mature oratorical delivery\b/gi, 'gravelly mature deep male timbre')
+      .replace(/\bgravelly mature oratorical delivery\b/gi, 'gravelly mature deep male RAPPER timbre')
       .replace(/\boratorical delivery\b/gi, 'rapped delivery')
       .replace(/\boratorical\b/gi, 'rapped')
-      .replace(/\bslow deliberate pacing\b/gi, 'tight syllabic flow on-beat');
-    const rapCues = [
+      .replace(/\bslow deliberate pacing\b/gi, 'tight syllabic flow on-beat')
+      .replace(/\bspeaking fundamental frequency\b/gi, 'rapped-pitch fundamental')
+      .replace(/\bspeaking F0\b/gi, 'rapped-pitch F0')
+      .replace(/\bno\s+tenor\s*\(~?\s*170\s*Hz\+?\s*\)/gi, 'no tenor')
+      .replace(/(?<!\d)\(~?\s*170\s*Hz\+?\s*\)/gi, '')
+      .replace(/\bJames Earl Jones-like(?:\s+extremely)?\s+deep\s+basso\s+profondo\s+male\s+voice\b/gi,
+        'deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz)')
+      .replace(/\bJames Earl Jones-like\s+basso\s+profondo\s+male\s+voice\b/gi,
+        'deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz)')
+      .replace(/,\s*,+/g, ',')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    const rapLead = [
+      'English UK drill RAP vocals',
       'rhythmic rapped delivery',
       'tight syllabic flow on-beat',
       'aggressive spit',
+      'one syllable per beat subdivision',
       'no singing',
       'no humming',
       'no melisma',
-      'no slow sung ballad vocals',
+      'no Arabic melismatic cries',
+      'no wordless vocal runs',
     ];
-    for (const cue of rapCues) {
-      const re = new RegExp(cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      if (!re.test(prompt)) prompt = `${cue}, ${prompt}`;
+    // Pull existing parts, drop ones we will re-lead, then rebuild: rap lead -> timbre -> rest
+    let parts = prompt.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
+    const leadLower = new Set(rapLead.map((c) => c.toLowerCase()));
+    parts = parts.filter((p) => !leadLower.has(p.toLowerCase()));
+    // Soften remaining celebrity-actor framing that still leads a clause
+    parts = parts.map((p) =>
+      p.replace(/^James Earl Jones-like\b/gi, 'deep basso profondo male RAPPER timbre (JEJ-depth),')
+        .replace(/,\s*,+/g, ',')
+        .trim()
+    ).filter(Boolean);
+    const timbreParts = parts.filter((p) => TIMBRE_RE.test(p));
+    const otherParts = parts.filter((p) => !TIMBRE_RE.test(p));
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const p of [...rapLead, ...timbreParts, ...otherParts]) {
+      const k = p.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      ordered.push(p);
     }
+    prompt = ordered.join(', ');
   }
 
-  // Force James Earl Jones-depth wording when user asked for deep male / baritone / basso
-  // NEVER inject "oratorical delivery" — it pulls slow sung/hummed delivery over rap.
-  const wantsJeJDepth = /\b(baritone|basso|profondo|james earl jones|chest voice|low male|deep male|oratorical)\b/i.test(prompt);
-  if (wantsJeJDepth && !/james earl jones/i.test(prompt)) {
+  // Force deep-basso depth wording when user asked for deep male / baritone / basso
+  // For rap: soft JEJ-depth pitch cue AFTER rap lead — never celebrity-actor / speaking-F0 lead.
+  const wantsJeJDepth = /\b(baritone|basso|profondo|james earl jones|jej-depth|chest voice|low male|deep male|oratorical)\b/i.test(prompt);
+  if (wantsJeJDepth && !/jej-depth|james earl jones/i.test(prompt)) {
     const jejLead = wantsRap
-      ? 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature deep male timbre, rhythmic rapped delivery, rumbling low register, no tenor (~170 Hz+)'
-      : 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature deep male timbre, rumbling low register, no tenor (~170 Hz+)';
-    prompt = `${jejLead}, ${prompt}`;
+      ? 'deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, rumbling low register, no tenor'
+      : 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature deep male timbre, rumbling low register, no tenor';
+    prompt = wantsRap ? `${prompt}, ${jejLead}` : `${jejLead}, ${prompt}`;
+  } else if (wantsRap && wantsJeJDepth) {
+    // Already has JEJ/depth wording — ensure rap lead is still first (promote may have run before rewrite)
+    prompt = promoteVocals(prompt);
   }
 
 
   // Lock dialed tempo in the caption (exact BPM, never doubled). Keeps vocal lead, then tempo.
   if (userBpm > 0) {
-    const tempoLock = `${userBpm} BPM, 4/4, kick on every beat, snare on 2 and 4, not half-time, not ${Math.round(userBpm / 2)} BPM`;
+    const tempoLock = wantsRap
+      ? `${userBpm} BPM, 4/4, kick on every beat, snare on 2 and 4, full-time from bar 1, not half-time intro, not half-time, not ${Math.round(userBpm / 2)} BPM`
+      : `${userBpm} BPM, 4/4, kick on every beat, snare on 2 and 4, not half-time, not ${Math.round(userBpm / 2)} BPM`;
     if (!new RegExp(`^${userBpm}\\s*BPM\\b`, 'i').test(prompt)) {
       prompt = `${tempoLock}, ${prompt}`;
     }
   }
-
-
 
   // Think + CoT metas lets constrained decoding lock the BPM field the engine already supports
   const isThinking = userBpm > 0 ? true : (params.thinking ?? false);
@@ -238,9 +290,9 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     else if (!/half-time feel|dragging tempo/i.test(lmNegative)) lmNegative = `${lmNegative}, ${antiHalf}`;
   }
   if (wantsRap) {
-    const antiSung = 'humming, melismatic singing, slow sung ballad vocals, crooning, operatic vocals, legato sung melody, spoken-sung hybrid';
+    const antiSung = 'humming, melismatic singing, slow sung ballad vocals, crooning, operatic vocals, legato sung melody, spoken-sung hybrid, Arabic melismatic cries, mawwal, wordless humming, vocal wails, melismatic ad-libs, sung vowel runs, chanting, Gregorian, operatic aria';
     if (!lmNegative || lmNegative === 'NO USER INPUT') lmNegative = antiSung;
-    else if (!/humming|melismatic|slow sung|crooning|operatic|legato sung|spoken-sung/i.test(lmNegative)) {
+    else if (!/Arabic melismatic|mawwal|wordless humming|vocal wails|melismatic ad-libs|sung vowel runs|chanting|Gregorian|operatic aria/i.test(lmNegative)) {
       lmNegative = `${lmNegative}, ${antiSung}`;
     }
   }

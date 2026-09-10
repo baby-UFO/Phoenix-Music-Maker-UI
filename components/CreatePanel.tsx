@@ -180,7 +180,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const BUILTIN_CREATE_DEFAULTS: CreateSettings = {
     customMode: true,
     lyrics: "[verse]\nGrew up where the roads stay broke and the power blink\nTephra in the air, still I stay in the link\nThey said ain't no work out here, pack it up and leave\nThen the line went live and I started to breathe\n\nLaptop in the shade, moss on the screen\nClient on the call like where you even been\nJungle bruh, fiber running through the green\nObama signed the check, now the pipeline clean\n\n[chorus]\nObama brought the fiber to the jungle\nNow I'm booking gigs, no more struggle\n808 slide, bass start to rumble\nDrop hit hard, whole canopy crumble\n\nGetting gigs in the jungle, yeah I'm on\nRemote from the vines, still get it gone\nFiber in the dirt, signal never wrong\nDrill in the mix when the wobble come on\n\n[drop]\n\n[verse]\nThey paved the park roads, left the residents last\nI stayed in the cut, let the signal hold fast\nGenerator kick, solar on the roof\nFiber in the ground, that's the real living proof\n\nGigs in the morning, gigs when the sun go down\nJungle don't sleep and neither do the sound\nDubstep in the chest, drill in the flow\nWhole island shaking when the drop let go\n\n[chorus]\nObama brought the fiber to the jungle\nNow I'm booking gigs, no more struggle\n808 slide, bass start to rumble\nDrop hit hard, whole canopy crumble\n\n[Instrumental Break]\n[Shouted]\nGicks in the jungle!\n\n[Outro]\n[Beat fades out, leaving synth pads and bass]\n[Final distorted synth note fades]",
-    style: "James Earl Jones-like basso profondo male voice (NOT baritone): speaking F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male timbre, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, no singing, no humming, no melisma, no slow sung ballad vocals, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange, babyUFO style, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive",
+    style: "English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange, babyUFO style, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive",
     title: "gigs3",
     instrumental: false,
     vocalLanguage: 'en',
@@ -1245,75 +1245,109 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   const handleGenerate = () => {
     const RAP_RE = /\b(rap|rapping|rapper|drill|trap|hip[- ]?hop|grime|boom[- ]?bap)\b/i;
+    const RAP_DELIVERY_RE = /\b(rhythmic rapped|rapped delivery|aggressive spit|tight syllabic|rap vocals|one syllable per beat|no singing|no humming|no melisma|no arabic melismatic|no wordless vocal)\b/i;
+    const TIMBRE_RE = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered|james earl jones|speaking f0|speaking fundamental|jej-depth|rapped-pitch)\b/i;
     const RAP_LM_NEG =
-      'humming, melismatic singing, slow sung ballad vocals, crooning, operatic vocals, legato sung melody, spoken-sung hybrid';
+      'humming, melismatic singing, slow sung ballad vocals, crooning, operatic vocals, legato sung melody, spoken-sung hybrid, Arabic melismatic cries, mawwal, wordless humming, vocal wails, melismatic ad-libs, sung vowel runs, chanting, Gregorian, operatic aria';
 
     function forceRapDelivery(caption: string): string {
       if (!caption || !RAP_RE.test(caption)) return caption;
-      // Strip/rewrite toxic oratorical + slow-sung cues that beat "rap" in the conditioner
-      let parts = caption.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
-      parts = parts
-        .map((p) =>
-          p
-            .replace(/\bgravelly mature oratorical delivery\b/gi, 'gravelly mature deep male timbre')
-            .replace(/\boratorical delivery\b/gi, 'rapped delivery')
-            .replace(/\boratorical\b/gi, 'rapped')
-            .replace(/\bslow deliberate pacing\b/gi, 'tight syllabic flow on-beat')
-        )
-        .filter((p) => p.length > 0);
-      let joined = parts.join(', ');
-      const needed = [
+      // Strip/rewrite toxic speaking/oratorical cues + orphan (~170 Hz+) pitch fragments
+      let cleaned = caption
+        .replace(/\bgravelly mature oratorical delivery\b/gi, 'gravelly mature deep male RAPPER timbre')
+        .replace(/\boratorical delivery\b/gi, 'rapped delivery')
+        .replace(/\boratorical\b/gi, 'rapped')
+        .replace(/\bslow deliberate pacing\b/gi, 'tight syllabic flow on-beat')
+        .replace(/\bspeaking fundamental frequency\b/gi, 'rapped-pitch fundamental')
+        .replace(/\bspeaking F0\b/gi, 'rapped-pitch F0')
+        .replace(/\bno\s+tenor\s*\(~?\s*170\s*Hz\+?\s*\)/gi, 'no tenor')
+        .replace(/(?<!\d)\(~?\s*170\s*Hz\+?\s*\)/gi, '')
+        .replace(/\bJames Earl Jones-like(?:\s+extremely)?\s+deep\s+basso\s+profondo\s+male\s+voice\b/gi,
+          'deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz)')
+        .replace(/\bJames Earl Jones-like\s+basso\s+profondo\s+male\s+voice(?:\s*\(NOT baritone\))?\b/gi,
+          'deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz)')
+        .replace(/,\s*,+/g, ',')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      const rapLead = [
+        'English UK drill RAP vocals',
         'rhythmic rapped delivery',
         'tight syllabic flow on-beat',
         'aggressive spit',
+        'one syllable per beat subdivision',
         'no singing',
         'no humming',
         'no melisma',
-        'no slow sung ballad vocals',
+        'no Arabic melismatic cries',
+        'no wordless vocal runs',
       ];
-      for (const cue of needed) {
-        const re = new RegExp(cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-        if (!re.test(joined)) joined = `${joined}, ${cue}`;
+      let parts = cleaned.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
+      const leadLower = new Set(rapLead.map((c) => c.toLowerCase()));
+      parts = parts.filter((p) => !leadLower.has(p.toLowerCase()));
+      parts = parts.map((p) =>
+        p.replace(/^James Earl Jones-like\b/gi, 'deep basso profondo male RAPPER timbre (JEJ-depth),')
+          .replace(/,\s*,+/g, ',')
+          .trim()
+      ).filter(Boolean);
+      const timbreParts = parts.filter((p) => TIMBRE_RE.test(p));
+      const otherParts = parts.filter((p) => !TIMBRE_RE.test(p));
+      const seen = new Set<string>();
+      const ordered: string[] = [];
+      for (const p of [...rapLead, ...timbreParts, ...otherParts]) {
+        const k = p.toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        ordered.push(p);
       }
-      return joined;
+      return ordered.join(', ');
     }
 
     const styleWithGender = (() => {
       const trimmed = style.trim();
       const isRap = RAP_RE.test(trimmed);
-      const hasVocalDetail = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|low male|deep male)\b/i.test(trimmed);
+      const hasVocalDetail = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|low male|deep male|rapper timbre|jej-depth)\b/i.test(trimmed);
       if (!vocalGender) {
         // Still prefer vocal detail at the front if present
         return forceRapDelivery(promoteVocalFront(trimmed));
       }
       const maleRapHint =
-        'James Earl Jones-like basso profondo male voice (NOT baritone): speaking F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male timbre, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, no singing, no humming, no melisma, no slow sung ballad vocals, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange';
+        'English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange';
       const maleNonRapHint =
         'James Earl Jones-like basso profondo male voice (NOT baritone): speaking F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange';
       const genderHint = vocalGender === 'male'
         ? (isRap ? maleRapHint : maleNonRapHint)
         : 'female vocals';
       // Don't stack a weak "Male vocals" if the style already describes the voice.
-      // Still forceRapDelivery when hasVocalDetail — user JEJ text may contain toxic oratorical/slow cues.
+      // Still forceRapDelivery when hasVocalDetail — user JEJ text may contain toxic speaking/oratorical cues.
       if (hasVocalDetail) return forceRapDelivery(promoteVocalFront(trimmed));
       return forceRapDelivery(promoteVocalFront(trimmed ? `${genderHint}, ${trimmed}` : genderHint));
     })();
 
     function promoteVocalFront(caption: string): string {
       if (!caption) return caption;
-      // Pull voice-related clauses to the front so the LM/DiT condition on them first
+      // Pull voice-related clauses to the front so the LM/DiT condition on them first.
+      // When rap/drill: RAP delivery BEFORE basso/JEJ timbre (JEJ-first biases hummed theater).
       const parts = caption.split(/,|\n/).map((p) => p.trim()).filter(Boolean);
-      const vocalRe = /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered|rapped delivery|rhythmic rapped)\b/i;
+      const wantsRapLocal = RAP_RE.test(caption);
+      const vocalRe = wantsRapLocal
+        ? new RegExp(RAP_DELIVERY_RE.source + '|' + TIMBRE_RE.source, 'i')
+        : /\b(baritone|basso(?:\s+profondo)?|bass voice|bass vocals?|tenor|alto|soprano|contralto|falsetto|profondo|chest voice|male vocals?|female vocals?|male singer|female singer|oratorical|low male|deep male|weathered|rapped delivery|rhythmic rapped)\b/i;
       const vocal = parts.filter((p) => vocalRe.test(p));
       const other = parts.filter((p) => !vocalRe.test(p));
       // Drop redundant bare "Male vocals" / "Female vocals" if richer vocal phrases exist
       let rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
       // JEJ target is basso profondo (~85-95 Hz). Plain "baritone" pulls ~110-140 Hz — strip it when deep-bass cues exist.
-      const hasDeepBass = rich.some((p) => /\b(basso|profondo|bass voice|bass vocals?|james earl jones)\b/i.test(p));
+      const hasDeepBass = rich.some((p) => /\b(basso|profondo|bass voice|bass vocals?|james earl jones|jej-depth)\b/i.test(p));
       if (hasDeepBass) {
         rich = rich.filter((p) => !/\bbaritone\b/i.test(p));
       }
-      const useVocal = rich.length ? rich : vocal;
+      let useVocal = rich.length ? rich : vocal;
+      if (wantsRapLocal && useVocal.length > 1) {
+        const rapParts = useVocal.filter((p) => RAP_DELIVERY_RE.test(p));
+        const timbreParts = useVocal.filter((p) => !RAP_DELIVERY_RE.test(p));
+        useVocal = [...rapParts, ...timbreParts];
+      }
       const merged = [...useVocal, ...other];
       // de-dupe case-insensitive
       const seen = new Set<string>();
@@ -1327,13 +1361,13 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       return out.join(', ');
     }
 
-    // When style asks for rap/drill, append anti-sung negatives so LM doesn't croon
+    // When style asks for rap/drill, append anti-sung / anti-mawwal negatives so LM doesn't croon or cry
     const effectiveLmNeg = (() => {
       const rapStyle = RAP_RE.test(styleWithGender) || RAP_RE.test(style);
       if (!rapStyle) return lmNegativePrompt;
       const base = lmNegativePrompt || '';
       if (!base || base === 'NO USER INPUT') return RAP_LM_NEG;
-      if (/humming|melismatic|slow sung|crooning|operatic|legato sung|spoken-sung/i.test(base)) return base;
+      if (/Arabic melismatic|mawwal|wordless humming|vocal wails|melismatic ad-libs|sung vowel runs|chanting|Gregorian|operatic aria/i.test(base)) return base;
       return `${base}, ${RAP_LM_NEG}`;
     })();
 
