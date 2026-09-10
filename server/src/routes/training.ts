@@ -784,7 +784,7 @@ router.post('/save-dataset', authMiddleware, async (req: AuthenticatedRequest, r
   try {
     const { savePath, datasetName, customTag, tagPosition, allInstrumental, genreRatio } = req.body;
     const name = (datasetName ?? 'my_lora_dataset').toString().trim() || 'my_lora_dataset';
-    const engineRoot = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || 'E:\\Phoenix-Engine';
+    const engineRoot = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || 'E:\\ACE-Step-1.5';
     const requested = (savePath ?? `./datasets/${name}.json`).toString().trim();
     const dest = path.isAbsolute(requested)
       ? requested
@@ -854,7 +854,7 @@ router.post('/start', authMiddleware, async (req: AuthenticatedRequest, res: Res
       seed, outputDir,
     } = req.body ?? {};
 
-    const engineDir = config.phoenixEngine?.path || 'E:\\Phoenix-Engine';
+    const engineDir = config.phoenixEngine?.path || 'E:\\ACE-Step-1.5';
     const resolveOut = (value: unknown, fallback: string) => {
       const raw = typeof value === 'string' && value.trim() ? value.trim() : fallback;
       return path.isAbsolute(raw) ? raw : path.resolve(engineDir, raw.replace(/^\.[\\/]/, ''));

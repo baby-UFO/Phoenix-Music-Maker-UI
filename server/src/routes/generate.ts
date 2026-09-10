@@ -611,7 +611,7 @@ router.get('/endpoints', authMiddleware, async (_req: AuthenticatedRequest, res:
 
 router.get('/models', async (_req, res: Response) => {
   try {
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
     const checkpointsDir = path.join(PHOENIX_ENGINE_DIR, 'checkpoints');
 
     // All known DiT models from Gradio's model_downloader.py registry:
@@ -718,7 +718,7 @@ router.get('/health', async (_req, res: Response) => {
 router.get('/limits', async (_req, res: Response) => {
   try {
     const { spawn } = await import('child_process');
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
@@ -849,7 +849,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
     // Fallback: Python spawn (only reached when REST API is unreachable)
     const { spawn } = await import('child_process');
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const SCRIPTS_DIR = path.join(__dirname, '../../scripts');

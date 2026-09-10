@@ -28,7 +28,7 @@ if not "%PHOENIX_ENGINE_PATH%"=="" (
     set ACESTEP_PATH=%PHOENIX_ENGINE_PATH%
 )
 if "%ACESTEP_PATH%"=="" (
-    set ACESTEP_PATH=..\Phoenix-Engine
+    set ACESTEP_PATH=..\ACE-Step-1.5
 )
 
 REM Check if Phoenix Engine exists
@@ -36,8 +36,8 @@ if not exist "%ACESTEP_PATH%" (
     echo.
     echo Warning: Phoenix Engine not found at %ACESTEP_PATH%
     echo.
-    echo Please set PHOENIX_ENGINE_PATH or place Phoenix-Engine next to Phoenix-Music-Maker-UI
-    echo Example: set PHOENIX_ENGINE_PATH=C:\Phoenix-Engine
+    echo Please set PHOENIX_ENGINE_PATH or place ACE-Step-1.5 next to Phoenix-Music-Maker-UI
+    echo Example: set PHOENIX_ENGINE_PATH=C:\ACE-Step-1.5
     echo.
     pause
     exit /b 1

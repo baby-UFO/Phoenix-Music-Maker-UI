@@ -35,7 +35,7 @@ function resolvePhoenixEnginePath(): string {
     return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
   }
   // Default: sibling Phoenix Engine install folder (also reachable via legacy ACE-Step-1.5 folder)
-  return path.resolve(__dirname, '../../../Phoenix-Engine');
+  return path.resolve(__dirname, '../../../ACE-Step-1.5');
 }
 
 // Resolve Python path cross-platform (supports venv and portable installations)

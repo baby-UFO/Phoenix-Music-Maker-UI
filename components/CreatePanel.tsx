@@ -224,7 +224,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     lmBatchChunkSize: 8,
     isFormatCaption: false,
     showLoraPanel: true,
-    loraPath: 'E:\Phoenix-Engine\lora_output_v3b\final\adapter',
+    loraPath: 'E:\ACE-Step-1.5\lora_output_v3b\final\adapter',
     loraEnabled: true,
     loraScale: 1.0,
   };
@@ -236,7 +236,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       const parsed = { ...BUILTIN_CREATE_DEFAULTS, ...JSON.parse(raw) } as CreateSettings;
       // Always prefer the v2 style adapter if saved path is missing/old
       const bad = !parsed.loraPath || /lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v3b/.test(parsed.loraPath);
-      if (bad) parsed.loraPath = 'E:\\Phoenix-Engine\\lora_output_v3b\\final\\adapter';
+      if (bad) parsed.loraPath = 'E:\\ACE-Step-1.5\\lora_output_v3b\\final\\adapter';
       return parsed;
     } catch {
       return { ...BUILTIN_CREATE_DEFAULTS };
@@ -348,7 +348,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   // LoRA Parameters
   const [showLoraPanel, setShowLoraPanel] = useState(cs('showLoraPanel', true));
-  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\Phoenix-Engine\lora_output_v3b\final\adapter'));
+  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\ACE-Step-1.5\lora_output_v3b\final\adapter'));
   const [loraLoaded, setLoraLoaded] = useState(false);
   const [loraEnabled, setLoraEnabled] = useState(cs('loraEnabled', true));
   const [loraScale, setLoraScale] = useState(cs('loraScale', 1.0));
