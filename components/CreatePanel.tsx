@@ -1267,7 +1267,12 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       const vocal = parts.filter((p) => vocalRe.test(p));
       const other = parts.filter((p) => !vocalRe.test(p));
       // Drop redundant bare "Male vocals" / "Female vocals" if richer vocal phrases exist
-      const rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
+      let rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
+      // JEJ target is basso profondo (~85-95 Hz). Plain "baritone" pulls ~110-140 Hz — strip it when deep-bass cues exist.
+      const hasDeepBass = rich.some((p) => /\b(basso|profondo|bass voice|bass vocals?|james earl jones)\b/i.test(p));
+      if (hasDeepBass) {
+        rich = rich.filter((p) => !/\bbaritone\b/i.test(p));
+      }
       const useVocal = rich.length ? rich : vocal;
       const merged = [...useVocal, ...other];
       // de-dupe case-insensitive
