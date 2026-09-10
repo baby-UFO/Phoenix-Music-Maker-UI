@@ -63,7 +63,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, song })
 
   // Platform-specific share text for better engagement
   const defaultShareText = `🎵 "${song.title}" ${song.style ? `(${song.style})` : ''} - Made with Phoenix Music Maker`;
-  const twitterText = `🔥 Just created "${song.title}" with Phoenix Music Maker - local AI music generation! ${song.style ? `#${song.style.replace(/\s+/g, '')}` : ''} #AIMusic #ACEStep`;
+  const twitterText = `🔥 Just created "${song.title}" with Phoenix Music Maker - local AI music generation! ${song.style ? `#${song.style.replace(/\s+/g, '')}` : ''} #AIMusic #PhoenixMusic`;
   const redditTitle = `[AI Music] ${song.title} - ${song.style || 'Original'} | Created with Phoenix Music Maker`;
   const whatsAppText = `🎧 Listen to this AI-generated song!\n\n"${song.title}" by ${song.creator || 'Unknown Artist'}\n${song.style ? `Genre: ${song.style}` : ''}\n\nMade with Phoenix Music Maker - free and open source!`;
   const telegramText = `🎵 "${song.title}" by ${song.creator || 'Unknown Artist'}\n${song.style ? `🎸 ${song.style}` : ''}\n\n🤖 Made with Phoenix Music Maker`;
