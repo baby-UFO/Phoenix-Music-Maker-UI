@@ -353,7 +353,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         );
         const lower = new Set(parts.map((p) => p.toLowerCase()));
         const lead: string[] = [];
-        if (![...lower].some((p) => /\b(rap|rapping|rapper|drill|trap|hip[- ]?hop)\b/i.test(p))) {
+        if (![...lower].some((p: string) => /\b(rap|rapping|rapper|drill|trap|hip[- ]?hop)\b/i.test(p))) {
           lead.push('uk drill RAP');
         }
         for (const cue of RAP_DELIVERY_CUES) {
@@ -493,6 +493,11 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [loraError, setLoraError] = useState<string | null>(null);
   const [isLoraLoading, setIsLoraLoading] = useState(false);
 
+  const [qualityPreset, setQualityPreset] = useState<'fast' | 'quality' | 'max' | null>(() => {
+    const s = (cs('qualityPreset', 'quality') as string) || 'quality';
+    return s === 'fast' || s === 'quality' || s === 'max' ? s : 'quality';
+  });
+
   // Persist Create settings so hard refresh keeps your dialed-in setup
   useEffect(() => {
     const payload: CreateSettings = {
@@ -532,10 +537,6 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   
   // Available models fetched from backend
   const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
-  const [qualityPreset, setQualityPreset] = useState<'fast' | 'quality' | 'max' | null>(() => {
-    const s = (cs('qualityPreset', 'quality') as string) || 'quality';
-    return s === 'fast' || s === 'quality' || s === 'max' ? s : 'quality';
-  });
   const [engineBootModel, setEngineBootModel] = useState<string | null>(null);
 
   const persistModel = useCallback((modelId: string) => {

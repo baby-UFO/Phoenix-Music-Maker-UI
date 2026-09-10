@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Phoenix model ID mapping.
  * UI / app-level IDs are phoenix-*; on-disk HF checkpoints and Gradio remain acestep-*.
  * Translate at the server/engine boundary with toEngineModelId before Gradio/python/boot.

@@ -11,6 +11,7 @@ import { mkdir, writeFile, readFile } from 'fs/promises';
 import { execSync, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
+import { toEngineModelId, toPhoenixModelId, getPhoenixModelLabel } from '../utils/phoenixModels.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -553,13 +554,17 @@ router.post('/init-model', authMiddleware, async (req: AuthenticatedRequest, res
 
     const client = await getGradioClient();
     try {
+      // Boundary: Phoenix UI ids → engine acestep-* folders for Gradio
+      const engineCheckpoint = checkpoint ? toEngineModelId(checkpoint) : '';
+      const engineConfigPath = configPath ? toEngineModelId(configPath) : '';
+      const engineLmPath = lmModelPath ? toEngineModelId(lmModelPath) : '';
       // Try calling by function name (may work if Gradio auto-names it)
       const result = await client.predict('/init_service_wrapper', [
-        checkpoint ?? '',
-        configPath ?? '',
+        engineCheckpoint,
+        engineConfigPath,
         device,
         initLlm,
-        lmModelPath,
+        engineLmPath,
         backend,
         useFlashAttention,
         offloadToCpu,
@@ -595,19 +600,31 @@ router.get('/checkpoints', authMiddleware, async (_req: AuthenticatedRequest, re
       return;
     }
 
-    // List checkpoint directories
+    // List checkpoint directories (map to Phoenix ids; hide raw acestep-* / junction dupes)
     const entries = readdirSync(checkpointDir);
-    const checkpoints = entries.filter(e => {
+    const dirEntries = entries.filter(e => {
       const fullPath = path.join(checkpointDir, e);
-      return statSync(fullPath).isDirectory();
+      return statSync(fullPath).isDirectory() && !e.startsWith('.');
     });
+    const skip = new Set(['vae', 'Qwen3-Embedding-0.6B']);
+    const phoenixCheckpoints = [...new Set(
+      dirEntries
+        .filter(e => !skip.has(e))
+        .map(e => (e.startsWith('acestep-') || e.startsWith('phoenix-')) ? toPhoenixModelId(e) : e)
+    )];
 
-    // List config directories (acestep-v15-*)
-    const configDirs = entries.filter(e =>
-      e.startsWith('acestep-v15') && statSync(path.join(checkpointDir, e)).isDirectory()
-    );
+    // DiT config dirs as Phoenix ids
+    const configDirs = [...new Set(
+      dirEntries
+        .filter(e => e.startsWith('acestep-v15') || e.startsWith('phoenix-v15'))
+        .map(e => toPhoenixModelId(e))
+    )];
 
-    res.json({ checkpoints, configs: configDirs });
+    res.json({
+      checkpoints: phoenixCheckpoints,
+      configs: configDirs,
+      checkpointsEngine: phoenixCheckpoints.map(n => ({ name: n, engineName: toEngineModelId(n), label: getPhoenixModelLabel(n) })),
+    });
   } catch (error) {
     console.error('[Training] List checkpoints error:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list checkpoints' });

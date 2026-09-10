@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { authApi, trainingApi, getTrainingAudioUrl, TrainingSample, DatasetSettings } from '../services/api';
+import { getPhoenixModelLabel, toPhoenixModelId } from '../utils/phoenixModels';
 
 type TrainingTab = 'dataset' | 'train' | 'export';
 
@@ -704,7 +705,7 @@ export const TrainingPanel: React.FC = () => {
               <div className="flex gap-2 items-center">
                 <FieldRow label="Checkpoint">
                   <select value={selectedCheckpoint} onChange={e => setSelectedCheckpoint(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200">
-                    {modelCheckpoints.map(c => <option key={c} value={c}>{c}</option>)}
+                    {modelCheckpoints.map(c => <option key={c} value={toPhoenixModelId(c)}>{getPhoenixModelLabel(c)}</option>)}
                     {modelCheckpoints.length === 0 && <option value="">No checkpoints found</option>}
                   </select>
                 </FieldRow>
@@ -714,7 +715,7 @@ export const TrainingPanel: React.FC = () => {
               </div>
               <FieldRow label="Config">
                 <select value={selectedConfig} onChange={e => setSelectedConfig(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200">
-                  {modelConfigs.map(c => <option key={c} value={c}>{c}</option>)}
+                  {modelConfigs.map(c => <option key={c} value={toPhoenixModelId(c)}>{getPhoenixModelLabel(c)}</option>)}
                   {modelConfigs.length === 0 && <option value="">No configs found</option>}
                 </select>
               </FieldRow>
