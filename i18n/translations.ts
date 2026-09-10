@@ -294,9 +294,9 @@ export const translations = {
     lmBackendVllm: 'VLLM (~9.2 GB VRAM)',
     lmBackendHint: 'PT uses less VRAM, VLLM may be faster on powerful GPUs',
     lmModelLabel: 'LM Model',
-    lmModel06B: '0.6B (Lightest, ~0.5 GB VRAM)',
-    lmModel17B: '1.7B (Balanced, ~1.5 GB VRAM)',
-    lmModel4B: '4B (Best quality, ~4 GB VRAM)',
+    lmModel06B: 'Phoenix 5Hz LM 0.6B (Lightest, ~0.5 GB VRAM)',
+    lmModel17B: 'Phoenix 5Hz LM 1.7B (Balanced, ~1.5 GB VRAM)',
+    lmModel4B: 'Phoenix 5Hz LM 4B (Best quality, ~4 GB VRAM)',
     lmModelHint: 'Controls the LLM used for lyrics/style enhancement. Auto-downloads if not present.',
     
     // CreatePanel - Transcription

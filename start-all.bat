@@ -45,7 +45,14 @@ if not exist "%ACESTEP_PATH%" (
 
 REM Prefer non-turbo DiT so inference steps >8 are not clamped to 8 by turbo.
 REM Must set BEFORE the ( ) block ? cmd expands %VAR% at parse time inside blocks.
-if "%ACESTEP_CONFIG_PATH%"=="" set "ACESTEP_CONFIG_PATH=acestep-v15-base"
+REM Prefer Phoenix junction name when present; else legacy acestep-* folder.
+if "%ACESTEP_CONFIG_PATH%"=="" (
+    if exist "%ACESTEP_PATH%\checkpoints\phoenix-v15-base" (
+        set "ACESTEP_CONFIG_PATH=phoenix-v15-base"
+    ) else (
+        set "ACESTEP_CONFIG_PATH=acestep-v15-base"
+    )
+)
 
 REM Detect Phoenix Engine installation type
 set API_COMMAND=
