@@ -142,6 +142,67 @@ function AppContent() {
     } catch { /* ignore */ }
   }, [createPanelWidth, isResizingCreatePanel]);
 
+  // Resizable left Sidebar width (md+ only; overlay on mobile)
+  const SIDEBAR_WIDTH_KEY = 'phoenix-sidebar-width';
+  const SIDEBAR_MIN_WIDTH = 160;
+  const SIDEBAR_MAX_WIDTH = 320;
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const stored = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+      if (stored) {
+        const n = parseInt(stored, 10);
+        if (!Number.isNaN(n) && n >= SIDEBAR_MIN_WIDTH && n <= SIDEBAR_MAX_WIDTH) return n;
+      }
+    } catch { /* ignore */ }
+    return 200;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const shellLayoutRef = useRef<HTMLDivElement>(null);
+
+  const clampSidebarWidth = useCallback((width: number) => {
+    return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, Math.round(width)));
+  }, []);
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!shellLayoutRef.current) return;
+      const rect = shellLayoutRef.current.getBoundingClientRect();
+      setSidebarWidth(clampSidebarWidth(e.clientX - rect.left));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingSidebar, clampSidebarWidth]);
+
+  useEffect(() => {
+    if (isResizingSidebar) return;
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
+    } catch { /* ignore */ }
+  }, [sidebarWidth, isResizingSidebar]);
+
   // Mobile UI Toggle
   const [mobileShowList, setMobileShowList] = useState(false);
 
@@ -1473,7 +1534,7 @@ function AppContent() {
 
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-suno text-zinc-900 dark:text-white font-sans antialiased selection:bg-pink-500/30 transition-colors duration-300">
-      <div className="flex-1 flex overflow-hidden">
+      <div ref={shellLayoutRef} className="flex-1 flex overflow-hidden">
         <Sidebar
           currentView={currentView}
           onNavigate={(v) => {
@@ -1502,7 +1563,26 @@ function AppContent() {
           onOpenSettings={() => setShowSettingsModal(true)}
           isOpen={showLeftSidebar}
           onToggle={() => setShowLeftSidebar(!showLeftSidebar)}
+          width={sidebarWidth}
+          isResizing={isResizingSidebar}
         />
+
+        {/* Left nav divider — muted zinc pill only (md+; sidebar overlay on mobile) */}
+        {showLeftSidebar && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            onMouseDown={handleSidebarResizeStart}
+            className="hidden md:flex flex-shrink-0 w-2.5 h-full cursor-col-resize z-20 items-center justify-center bg-transparent"
+          >
+            <div
+              className={`w-1 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 transition-colors ${
+                isResizingSidebar ? 'bg-zinc-400 dark:bg-zinc-500' : 'hover:bg-zinc-400 dark:hover:bg-zinc-500'
+              }`}
+            />
+          </div>
+        )}
 
         <main className="flex-1 flex overflow-hidden relative">
           {renderContent()}

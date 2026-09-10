@@ -14,6 +14,8 @@ interface SidebarProps {
   onOpenSettings?: () => void;
   isOpen?: boolean;
   onToggle?: () => void;
+  width?: number;
+  isResizing?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -27,8 +29,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   isOpen = true,
   onToggle,
+  width,
+  isResizing = false,
 }) => {
   const { t } = useI18n();
+
+  const openWidthStyle =
+    isOpen && typeof width === 'number'
+      ? ({ width: `${width}px` } as React.CSSProperties)
+      : undefined;
 
   return (
     <>
@@ -41,11 +50,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Sidebar */}
-      <div className={`
-        flex flex-col h-full bg-white dark:bg-suno-sidebar border-r border-zinc-200 dark:border-white/5 flex-shrink-0 py-4 overflow-y-auto scrollbar-hide transition-all duration-300
+      <div
+        className={`
+        flex flex-col h-full bg-white dark:bg-suno-sidebar border-r border-zinc-200 dark:border-white/5 flex-shrink-0 py-4 overflow-y-auto scrollbar-hide
         fixed left-0 top-0 z-50 md:relative
-        ${isOpen ? 'w-[200px]' : 'w-[72px]'}
-      `}>
+        ${isResizing ? '' : 'transition-all duration-300'}
+        ${isOpen ? (typeof width === 'number' ? '' : 'w-[200px]') : 'w-[72px]'}
+      `}
+        style={openWidthStyle}
+      >
       {/* Logo & Brand */}
       <div className="px-3 mb-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
