@@ -242,7 +242,7 @@ Stop with ./stop-all.sh.
 
 # Example path name kept for compatibility with existing scripts:
 
-git clone <your-engine-repo-or-mirror> Phoenix-Engine
+git clone https://github.com/ace-step/ACE-Step-1.5 ACE-Step-1.5  # folder name; product label is Phoenix Engine
 
 cd ACE-Step-1.5
 
