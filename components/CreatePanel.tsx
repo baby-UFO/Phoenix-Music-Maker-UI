@@ -503,6 +503,12 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   });
   const [isResizing, setIsResizing] = useState(false);
   const lyricsRef = useRef<HTMLDivElement>(null);
+  const [styleHeight, setStyleHeight] = useState(() => {
+    const saved = lsGet(storageKeys.styleHeight.primary, storageKeys.styleHeight.legacy);
+    return saved ? parseInt(saved, 10) : 80; // Default h-20 = 80px
+  });
+  const [isResizingStyle, setIsResizingStyle] = useState(false);
+  const styleRef = useRef<HTMLDivElement>(null);
 
 
   // Close model menu when clicking outside
@@ -873,9 +879,48 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     };
   }, []);
 
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingStyle || !styleRef.current) return;
+      const rect = styleRef.current.getBoundingClientRect();
+      const newHeight = e.clientY - rect.top;
+      if (newHeight > 64 && newHeight < 600) {
+        setStyleHeight(newHeight);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingStyle(false);
+      document.body.style.cursor = "default";
+      document.body.style.userSelect = "auto";
+      if (styleRef.current) {
+        lsSet(storageKeys.styleHeight.primary, String(Math.round(styleRef.current.getBoundingClientRect().height)), storageKeys.styleHeight.legacy);
+      }
+    };
+
+    if (isResizingStyle) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "ns-resize";
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "default";
+      document.body.style.userSelect = "auto";
+    };
+  }, [isResizingStyle]);
+
   const startResizing = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
+  };
+
+  const startResizingStyle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingStyle(true);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, target: 'reference' | 'source') => {
@@ -1841,7 +1886,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
             {/* Style Input */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20">
-              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5">
+              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{t('styleOfMusic')}</span>
@@ -1880,12 +1925,22 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                   </button>
                 </div>
               </div>
-              <textarea
-                value={style}
-                onChange={(e) => setStyle(e.target.value)}
-                placeholder={t('stylePlaceholder')}
-                className="w-full h-20 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
-              />
+              <div ref={styleRef} className="relative">
+                <textarea
+                  value={style}
+                  onChange={(e) => setStyle(e.target.value)}
+                  placeholder={t('stylePlaceholder')}
+                  className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
+                  style={{ height: `${styleHeight}px` }}
+                />
+                {/* Resize Handle */}
+                <div
+                  onMouseDown={startResizingStyle}
+                  className="h-3 w-full cursor-ns-resize flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors absolute bottom-0 left-0 z-10"
+                >
+                  <div className="w-8 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700"></div>
+                </div>
+              </div>
               <div className="px-3 pb-3 space-y-3">
                 {/* Quick Tags */}
                 <div className="flex flex-wrap gap-2">
