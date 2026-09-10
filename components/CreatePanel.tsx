@@ -1989,14 +1989,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               <input
                 type="text"
                 value={title}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setTitle(next);
-                  const trimmed = next.trim();
-                  if (trimmed && trimmed !== titleVersionRef.current.base) {
-                    persistTitleVersion({ base: trimmed, next: 1 });
-                  }
-                }}
+                onChange={(e) => setTitle(e.target.value)}
                 placeholder={t('nameSong')}
                 className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
               />
