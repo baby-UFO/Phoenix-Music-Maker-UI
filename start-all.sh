@@ -23,15 +23,15 @@ if [ ! -d "server/node_modules" ]; then
 fi
 
 # Get Phoenix Engine path from environment or use default
-ACESTEP_PATH="${ACESTEP_PATH:-../Phoenix Engine-1.5}"
+ACESTEP_PATH="${ACESTEP_PATH:-../ACE-Step-1.5}"
 
 # Check if Phoenix Engine exists
 if [ ! -d "$ACESTEP_PATH" ]; then
     echo
     echo "Warning: Phoenix Engine not found at $ACESTEP_PATH"
     echo
-    echo "Please set ACESTEP_PATH or place Phoenix Engine-1.5 next to Phoenix-Music-Maker-UI"
-    echo "Example: export ACESTEP_PATH=/path/to/Phoenix Engine-1.5"
+    echo "Please set ACESTEP_PATH or place ACE-Step-1.5 next to Phoenix-Music-Maker-UI"
+    echo "Example: export ACESTEP_PATH=/path/to/ACE-Step-1.5"
     echo
     exit 1
 fi
@@ -55,7 +55,7 @@ mkdir -p logs
 # Start Phoenix Engine API in background
 echo "[1/3] Starting Phoenix Engine API server..."
 cd "$ACESTEP_PATH"
-uv run acestep-api --port 8001 > "../Phoenix-Music-Maker-UI/logs/api.log" 2>&1 &
+uv run acestep-api --port 8001 > "$ROOT_DIR/logs/api.log" 2>&1 &
 API_PID=$!
 cd - > /dev/null
 

@@ -25,7 +25,7 @@ if not exist "server\node_modules" (
 
 REM Get Phoenix Engine path from environment or use default
 if "%ACESTEP_PATH%"=="" (
-    set ACESTEP_PATH=..\Phoenix Engine-1.5
+    set ACESTEP_PATH=..\ACE-Step-1.5
 )
 
 REM Check if Phoenix Engine exists
@@ -33,8 +33,8 @@ if not exist "%ACESTEP_PATH%" (
     echo.
     echo Warning: Phoenix Engine not found at %ACESTEP_PATH%
     echo.
-    echo Please set ACESTEP_PATH or place Phoenix Engine-1.5 next to Phoenix-Music-Maker-UI
-    echo Example: set ACESTEP_PATH=C:\Phoenix Engine-1.5
+    echo Please set ACESTEP_PATH or place ACE-Step-1.5 next to Phoenix-Music-Maker-UI
+    echo Example: set ACESTEP_PATH=C:\ACE-Step-1.5
     echo.
     pause
     exit /b 1

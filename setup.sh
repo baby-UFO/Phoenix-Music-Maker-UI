@@ -8,15 +8,15 @@ echo "  Phoenix Music Maker UI Setup"
 echo "=================================="
 
 # Check if Phoenix Engine exists
-ACESTEP_PATH="${ACESTEP_PATH:-../Phoenix Engine-1.5}"
+ACESTEP_PATH="${ACESTEP_PATH:-../ACE-Step-1.5}"
 
 if [ ! -d "$ACESTEP_PATH" ]; then
     echo "Error: Phoenix Engine not found at $ACESTEP_PATH"
     echo ""
     echo "Please clone Phoenix Engine first:"
     echo "  cd .."
-    echo "  git clone https://github.com/ace-step/Phoenix Engine-1.5"
-    echo "  cd Phoenix Engine-1.5"
+    echo "  git clone https://github.com/ace-step/ACE-Step-1.5"
+    echo "  cd ACE-Step-1.5"
     echo "  uv venv && uv pip install -e ."
     echo "  cd ../Phoenix-Music-Maker-UI"
     echo "  ./setup.sh"
