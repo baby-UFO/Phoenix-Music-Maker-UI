@@ -6,6 +6,7 @@ import { useI18n } from '../context/I18nContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { AlbumCover } from './AlbumCover';
 import { songsApi } from '../services/api';
+import { getPhoenixModelLabel, toPhoenixModelId } from '../utils/phoenixModels';
 
 interface SongListProps {
     songs: Song[];
@@ -38,19 +39,10 @@ interface SongListProps {
 // Define Filter Types
 type FilterType = 'liked' | 'generating';
 
-// Map model ID to short display name
+// Map model ID to Phoenix display label
 const getModelDisplayName = (modelId?: string): string => {
-    if (!modelId) return 'v1.5';
-    
-    const mapping: Record<string, string> = {
-        'acestep-v15-base': '1.5B',
-        'acestep-v15-sft': '1.5S',
-        'acestep-v15-turbo-shift1': '1.5TS1',
-        'acestep-v15-turbo-shift3': '1.5TS3',
-        'acestep-v15-turbo-continuous': '1.5TC',
-        'acestep-v15-turbo': '1.5T',
-    };
-    return mapping[modelId] || 'v1.5';
+    if (!modelId) return 'Phoenix V15';
+    return getPhoenixModelLabel(toPhoenixModelId(modelId));
 };
 
 const createDragPreview = (element: HTMLElement) => {

@@ -7,6 +7,13 @@ import { generateApi } from '../services/api';
 import { MAIN_STYLES } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
 import { lsGet, lsSet, storageKeys } from '../utils/phoenixStorage';
+import {
+  toPhoenixModelId,
+  getPhoenixModelLabel,
+  migrateToPhoenixModelId,
+  isTurboModelId,
+  PHOENIX_DIT_MODELS,
+} from '../utils/phoenixModels';
 
 interface ReferenceTrack {
   id: string;
@@ -434,7 +441,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(cs('inferMethod', 'sde'));
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>(cs('lmBackend', 'vllm'));
   const [lmModel, setLmModel] = useState(() => {
-    return lsGet(storageKeys.lmModel.primary, storageKeys.lmModel.legacy) || 'acestep-5Hz-lm-4B';
+    return migrateToPhoenixModelId(lsGet(storageKeys.lmModel.primary, storageKeys.lmModel.legacy) || 'phoenix-5Hz-lm-4B');
   });
   const [shift, setShift] = useState(cs('shift', 1.0));
 
@@ -517,7 +524,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return lsGet(storageKeys.model.primary, storageKeys.model.legacy) || 'acestep-v15-base';
+    return migrateToPhoenixModelId(lsGet(storageKeys.model.primary, storageKeys.model.legacy) || 'phoenix-v15-base');
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -532,8 +539,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [engineBootModel, setEngineBootModel] = useState<string | null>(null);
 
   const persistModel = useCallback((modelId: string) => {
-    setSelectedModel(modelId);
-    lsSet(storageKeys.model.primary, modelId, storageKeys.model.legacy);
+    const phoenixId = toPhoenixModelId(modelId);
+    setSelectedModel(phoenixId);
+    lsSet(storageKeys.model.primary, phoenixId, storageKeys.model.legacy);
   }, []);
 
   const applyQualityPreset = useCallback((preset: 'fast' | 'quality' | 'max') => {
@@ -541,26 +549,26 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     // Persist via create-settings effect (qualityPreset in payload) + direct key
     try { localStorage.setItem('ace-create-qualityPreset', preset); } catch { /* ignore */ }
 
-    const hasSft = fetchedModels.some((m) => m.name === 'acestep-v15-sft' && m.is_preloaded);
+    const hasSft = fetchedModels.some((m) => (m.name === 'phoenix-v15-sft' || m.name === 'acestep-v15-sft') && m.is_preloaded);
     const turboId =
-      fetchedModels.find((m) => m.name === 'acestep-v15-turbo' && m.is_preloaded)?.name
+      fetchedModels.find((m) => (m.name === 'phoenix-v15-turbo' || m.name === 'acestep-v15-turbo') && m.is_preloaded)?.name
       || fetchedModels.find((m) => /turbo/i.test(m.name) && m.is_preloaded)?.name
-      || 'acestep-v15-turbo';
+      || 'phoenix-v15-turbo';
 
     if (preset === 'fast') {
-      persistModel(turboId);
+      persistModel(toPhoenixModelId(turboId));
       setInferenceSteps(8);
       setInferMethod('ode');
       setShift(3.0);
       setUseAdg(false);
     } else if (preset === 'quality') {
-      persistModel('acestep-v15-base');
+      persistModel('phoenix-v15-base');
       setInferenceSteps(100);
       setInferMethod('sde');
       setShift(1.0);
       setUseAdg(true);
     } else {
-      persistModel(hasSft ? 'acestep-v15-sft' : 'acestep-v15-base');
+      persistModel(hasSft ? 'phoenix-v15-sft' : 'phoenix-v15-base');
       setInferenceSteps(200);
       setInferMethod('sde');
       setShift(1.0);
@@ -572,44 +580,28 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
     if (fetchedModels.length > 0) {
-      return fetchedModels.map(m => ({ id: m.name, name: m.name }));
+      return fetchedModels.map(m => {
+        const id = toPhoenixModelId(m.name);
+        return { id, name: id };
+      });
     }
-    return [
-      { id: 'acestep-v15-base', name: 'acestep-v15-base' },
-      { id: 'acestep-v15-sft', name: 'acestep-v15-sft' },
-      { id: 'acestep-v15-turbo', name: 'acestep-v15-turbo' },
-      { id: 'acestep-v15-turbo-shift1', name: 'acestep-v15-turbo-shift1' },
-      { id: 'acestep-v15-turbo-shift3', name: 'acestep-v15-turbo-shift3' },
-      { id: 'acestep-v15-turbo-continuous', name: 'acestep-v15-turbo-continuous' },
-    ];
+    return PHOENIX_DIT_MODELS.map((id) => ({ id, name: id }));
   }, [fetchedModels]);
 
-  // Map model ID to short display name
-  const getModelDisplayName = (modelId: string): string => {
-    const mapping: Record<string, string> = {
-      'acestep-v15-base': '1.5B',
-      'acestep-v15-sft': '1.5S',
-      'acestep-v15-turbo-shift1': '1.5TS1',
-      'acestep-v15-turbo-shift3': '1.5TS3',
-      'acestep-v15-turbo-continuous': '1.5TC',
-      'acestep-v15-turbo': '1.5T',
-    };
-    return mapping[modelId] || modelId;
-  };
+  // Map model ID to Phoenix display label (shared helper)
+  const getModelDisplayName = (modelId: string): string => getPhoenixModelLabel(modelId);
 
   // Check if model is a turbo variant
-  const isTurboModel = (modelId: string): boolean => {
-    return modelId.includes('turbo');
-  };
+  const isTurboModel = (modelId: string): boolean => isTurboModelId(modelId);
 
   const TURBO_INFER_STEPS_MAX = 8;
 
   const preferNonTurboModel = useCallback((models: { id: string; name: string }[]): string => {
-    const ids = models.map((m) => m.id);
-    if (ids.includes('acestep-v15-base')) return 'acestep-v15-base';
-    if (ids.includes('acestep-v15-sft')) return 'acestep-v15-sft';
+    const ids = models.map((m) => toPhoenixModelId(m.id));
+    if (ids.includes('phoenix-v15-base')) return 'phoenix-v15-base';
+    if (ids.includes('phoenix-v15-sft')) return 'phoenix-v15-sft';
     const nonTurbo = ids.find((id) => !id.includes('turbo'));
-    return nonTurbo || 'acestep-v15-base';
+    return nonTurbo || 'phoenix-v15-base';
   }, []);
 
   const switchToNonTurboForHighSteps = useCallback((steps: number, currentModel: string) => {
@@ -617,8 +609,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     if (!isTurboModel(currentModel)) return currentModel;
     const next = preferNonTurboModel(availableModels);
     if (next !== currentModel) {
-      setSelectedModel(next);
-      lsSet(storageKeys.model.primary, next, storageKeys.model.legacy);
+      const phoenixNext = toPhoenixModelId(next);
+      setSelectedModel(phoenixNext);
+      lsSet(storageKeys.model.primary, phoenixNext, storageKeys.model.legacy);
       setUseAdg(true);
       console.log(`[CreatePanel] inferenceSteps=${steps} on turbo '${currentModel}' → auto-switch to '${next}'`);
     }
@@ -996,21 +989,23 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         if (models.length > 0) {
           setFetchedModels(models);
           if (data.bootModel || data.boot_model) {
-            setEngineBootModel(data.bootModel || data.boot_model);
+            setEngineBootModel(toPhoenixModelId(data.bootModel || data.boot_model));
           } else {
             const active = models.find((m: any) => m.is_active)?.name || models.find((m: any) => m.is_preloaded && !/turbo/i.test(m.name))?.name || null;
             // Prefer server-reported boot; fallback stays null until API adds bootModel
-            if (data.engineConfigPath) setEngineBootModel(data.engineConfigPath);
+            if (data.engineConfigPath) setEngineBootModel(toPhoenixModelId(data.engineConfigPath));
           }
           // Prefer non-turbo when high steps requested. Don't blindly force engine "active" turbo.
-          const saved = lsGet(storageKeys.model.primary, storageKeys.model.legacy);
-          const preferBase = models.find((m: any) => m.name === 'acestep-v15-base')
-            || models.find((m: any) => m.name === 'acestep-v15-sft')
+          const savedRaw = lsGet(storageKeys.model.primary, storageKeys.model.legacy);
+          const saved = savedRaw ? migrateToPhoenixModelId(savedRaw) : '';
+          const preferBase = models.find((m: any) => toPhoenixModelId(m.name) === 'phoenix-v15-base')
+            || models.find((m: any) => toPhoenixModelId(m.name) === 'phoenix-v15-sft')
             || models.find((m: any) => !String(m.name).includes('turbo'));
           const active = models.find((m: any) => m.is_active);
-          let next = saved || (preferBase ? preferBase.name : undefined) || active?.name || 'acestep-v15-base';
+          let next = saved || (preferBase ? toPhoenixModelId(preferBase.name) : undefined) || (active ? toPhoenixModelId(active.name) : undefined) || 'phoenix-v15-base';
+          next = toPhoenixModelId(next);
           if ((typeof inferenceSteps === 'number' ? inferenceSteps : 200) > 8 && String(next).includes('turbo') && preferBase) {
-            next = preferBase.name;
+            next = toPhoenixModelId(preferBase.name);
           }
           setSelectedModel(next);
           lsSet(storageKeys.model.primary, next, storageKeys.model.legacy);
@@ -1189,7 +1184,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         temperature: lmTemperature,
         topK: lmTopK > 0 ? lmTopK : undefined,
         topP: lmTopP,
-        lmModel: lmModel || 'acestep-5Hz-lm-0.6B',
+        lmModel: lmModel || 'phoenix-5Hz-lm-0.6B',
         lmBackend: lmBackend || 'pt',
       }, token);
 
@@ -1768,8 +1763,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                       <button
                         key={model.id}
                         onClick={() => {
-                          setSelectedModel(model.id);
-                          lsSet(storageKeys.model.primary, model.id, storageKeys.model.legacy);
+                          const phoenixId = toPhoenixModelId(model.id);
+                          setSelectedModel(phoenixId);
+                          lsSet(storageKeys.model.primary, phoenixId, storageKeys.model.legacy);
                           // Auto-adjust parameters for non-turbo models
                           if (!isTurboModel(model.id)) {
                             if (inferenceSteps <= TURBO_INFER_STEPS_MAX) setInferenceSteps(20);
@@ -2294,9 +2290,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Quality</span>
                   {(
                     [
-                      { id: 'fast' as const, label: 'Fast', hint: 'turbo · 8 · ode' },
-                      { id: 'quality' as const, label: 'Quality', hint: 'base · 100 · sde' },
-                      { id: 'max' as const, label: 'Max', hint: 'sft/base · 200 · sde' },
+                      { id: 'fast' as const, label: 'Fast', hint: 'Phoenix V15 Turbo | 8 | ode' },
+                      { id: 'quality' as const, label: 'Quality', hint: 'Phoenix V15 Base | 100 | sde' },
+                      { id: 'max' as const, label: 'Max', hint: 'Phoenix V15 SFT/Base | 200 | sde' },
                     ]
                   ).map((preset) => (
                     <button
@@ -2316,7 +2312,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 </div>
                 {engineBootModel && (
                   <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-snug">
-                    Engine boot model: <span className="font-semibold">{engineBootModel}</span>
+                    Engine boot model: <span className="font-semibold">{getPhoenixModelLabel(engineBootModel)}</span>
                     {" — "}DiT checkpoint is fixed at engine start (no live hot-swap). Fast/turbo needs a turbo boot; Quality/Max use base/sft with high steps on the current engine.
                   </p>
                 )}
@@ -2723,9 +2719,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 onChange={(e) => { const v = e.target.value; setLmModel(v); lsSet(storageKeys.lmModel.primary, v, storageKeys.lmModel.legacy); }}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
               >
-                <option value="acestep-5Hz-lm-0.6B">{t('lmModel06B')}</option>
-                <option value="acestep-5Hz-lm-1.7B">{t('lmModel17B')}</option>
-                <option value="acestep-5Hz-lm-4B">{t('lmModel4B')}</option>
+                <option value="phoenix-5Hz-lm-0.6B">{t('lmModel06B')}</option>
+                <option value="phoenix-5Hz-lm-1.7B">{t('lmModel17B')}</option>
+                <option value="phoenix-5Hz-lm-4B">{t('lmModel4B')}</option>
               </select>
               <p className="text-[10px] text-zinc-500">{t('lmModelHint')}</p>
             </div>

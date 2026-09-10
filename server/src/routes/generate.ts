@@ -19,6 +19,7 @@ import {
   resolvePythonPath,
 } from '../services/phoenixEngine.js';
 import { getStorageProvider } from '../services/storage/factory.js';
+import { toEngineModelId, toPhoenixModelId, getPhoenixModelLabel, PHOENIX_DIT_MODELS } from '../utils/phoenixModels.js';
 
 const router = Router();
 
@@ -314,6 +315,10 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       isFormatCaption,
       ditModel,
     } = req.body as GenerateBody;
+
+    // Normalize client model ids to Phoenix for persistence / UI; engine maps via toEngineModelId
+    ditModel = ditModel ? toPhoenixModelId(ditModel) : ditModel;
+    lmModel = lmModel ? toPhoenixModelId(lmModel) : lmModel;
 
     if (!customMode && !songDescription) {
       res.status(400).json({ error: 'Song description required for simple mode' });
@@ -654,13 +659,14 @@ router.get('/models', async (_req, res: Response) => {
     // - MAIN_MODEL_COMPONENTS includes "acestep-v15-turbo" (bundled with main download)
     // - SUBMODEL_REGISTRY includes the rest (separate HuggingFace repos, auto-downloaded on init)
     const ALL_DIT_MODELS = [
-      'acestep-v15-turbo',             // default, from main model repo
-      'acestep-v15-base',              // submodel
-      'acestep-v15-sft',               // submodel
-      'acestep-v15-turbo-shift1',      // submodel
-      'acestep-v15-turbo-shift3',      // submodel
-      'acestep-v15-turbo-continuous',   // submodel
+      'phoenix-v15-turbo',
+      'phoenix-v15-base',
+      'phoenix-v15-sft',
+      'phoenix-v15-turbo-shift1',
+      'phoenix-v15-turbo-shift3',
+      'phoenix-v15-turbo-continuous',
     ];
+    const ALL_ENGINE_DIT_MODELS = ALL_DIT_MODELS.map((n) => toEngineModelId(n));
 
     // Query Gradio /v1/models to get the currently loaded/active model
     let activeModel: string | null = null;
@@ -681,14 +687,18 @@ router.get('/models', async (_req, res: Response) => {
     // Matches Gradio's handler.py check_model_exists() and get_available_acestep_v15_models()
     const { existsSync, statSync } = await import('fs');
     const downloaded = new Set<string>();
-    for (const model of ALL_DIT_MODELS) {
-      const modelPath = path.join(checkpointsDir, model);
+    for (const phoenixName of ALL_DIT_MODELS) {
+      const engineName = toEngineModelId(phoenixName);
+      // Resolve via phoenix junction OR acestep-* folder
+      const candidates = [path.join(checkpointsDir, phoenixName), path.join(checkpointsDir, engineName)];
       try {
-        if (existsSync(modelPath) && statSync(modelPath).isDirectory()) {
-          // Require weights so a partial HF download folder is not treated as ready
-          const weights = path.join(modelPath, 'model.safetensors');
-          if (existsSync(weights) && statSync(weights).isFile() && statSync(weights).size > 1_000_000) {
-            downloaded.add(model);
+        for (const modelPath of candidates) {
+          if (existsSync(modelPath) && statSync(modelPath).isDirectory()) {
+            const weights = path.join(modelPath, 'model.safetensors');
+            if (existsSync(weights) && statSync(weights).isFile() && statSync(weights).size > 1_000_000) {
+              downloaded.add(phoenixName);
+              break;
+            }
           }
         }
       } catch { /* skip */ }
@@ -699,18 +709,24 @@ router.get('/models', async (_req, res: Response) => {
     try {
       const { readdirSync } = await import('fs');
       for (const entry of readdirSync(checkpointsDir)) {
-        if (entry.startsWith('acestep-v15-') && statSync(path.join(checkpointsDir, entry)).isDirectory()) {
-          downloaded.add(entry);
-          if (!ALL_DIT_MODELS.includes(entry)) {
-            ALL_DIT_MODELS.push(entry);
+        const full = path.join(checkpointsDir, entry);
+        if (!statSync(full).isDirectory()) continue;
+        if (entry.startsWith('acestep-v15-') || entry.startsWith('phoenix-v15-')) {
+          const phoenixName = toPhoenixModelId(entry);
+          downloaded.add(phoenixName);
+          if (!ALL_DIT_MODELS.includes(phoenixName)) {
+            ALL_DIT_MODELS.push(phoenixName);
           }
         }
       }
     } catch { /* checkpoints dir may not exist */ }
 
+    const activePhoenix = activeModel ? toPhoenixModelId(activeModel) : null;
     const models = ALL_DIT_MODELS.map(name => ({
-      name,
-      is_active: name === activeModel,
+      name, // Phoenix id for client
+      engineName: toEngineModelId(name),
+      label: getPhoenixModelLabel(name),
+      is_active: name === activePhoenix,
       is_preloaded: downloaded.has(name),
     }));
 
@@ -741,8 +757,9 @@ router.get('/models', async (_req, res: Response) => {
     // Prefer activeModel from Gradio when available; else boot path
     if (!activeModel && engineConfigPath) {
       activeModel = engineConfigPath;
+      const bootPhoenix = toPhoenixModelId(engineConfigPath);
       for (const m of models) {
-        m.is_active = m.name === activeModel;
+        m.is_active = m.name === bootPhoenix;
       }
       models.sort((a, b) => {
         if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
@@ -751,11 +768,13 @@ router.get('/models', async (_req, res: Response) => {
       });
     }
 
+    const bootPhoenix = engineConfigPath ? toPhoenixModelId(engineConfigPath) : null;
     res.json({
       models,
-      bootModel: engineConfigPath,
-      engineConfigPath,
-      note: 'DiT checkpoint is selected at engine boot via --config_path. /v1/init hot-swap is not available on this build.',
+      bootModel: bootPhoenix,
+      engineConfigPath: bootPhoenix,
+      engineConfigPathRaw: engineConfigPath,
+      note: 'DiT checkpoint is selected at engine boot via --config_path. /v1/init hot-swap is not available on this build. Client IDs are phoenix-*; engine folders remain acestep-*.',
     });
   } catch (error) {
     console.error('Models error:', error);
@@ -940,7 +959,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
     if (temperature !== undefined) args.push('--temperature', String(temperature));
     if (topK && topK > 0) args.push('--top-k', String(topK));
     if (topP !== undefined) args.push('--top-p', String(topP));
-    if (lmModel) args.push('--lm-model', lmModel);
+    if (lmModel) args.push('--lm-model', toEngineModelId(lmModel));
     if (lmBackend) args.push('--lm-backend', lmBackend);
 
     console.log(`[Format] Fallback spawn: ${pythonPath} ${args.join(' ')}`);

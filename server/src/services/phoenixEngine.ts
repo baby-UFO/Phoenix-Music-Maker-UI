@@ -21,6 +21,7 @@ function getAudioDuration(filePath: string): number {
 import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
 import { getGradioClient, resetGradioClient, isGradioAvailable } from './gradio-client.js';
+import { toEngineModelId, toPhoenixModelId } from '../utils/phoenixModels.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -563,7 +564,13 @@ function checkpointDirFor(model: string): string {
 }
 
 function isCheckpointOnDisk(model: string): boolean {
-  const dir = checkpointDirFor(model);
+  const engineId = toEngineModelId(model);
+  const phoenixId = toPhoenixModelId(model);
+  // Prefer engine folder; also accept phoenix-* junction if present
+  let dir = checkpointDirFor(engineId);
+  if (!existsSync(dir) && phoenixId !== engineId) {
+    dir = checkpointDirFor(phoenixId);
+  }
   if (!existsSync(dir)) return false;
   // Prefer a real weight file if present; otherwise accept non-empty dir with config.json
   try {
@@ -586,6 +593,7 @@ function resolveNonTurboDitModel(): string {
  * Mutates params in place. Does NOT remove the engine clamp — wrong architecture.
  */
 function enforceNonTurboForHighSteps(params: GenerationParams): void {
+  if (params.ditModel) params.ditModel = toEngineModelId(params.ditModel);
   const steps = params.inferenceSteps ?? 8;
   if (steps <= TURBO_STEPS_CAP) return;
   if (!isTurboDitModel(params.ditModel) && params.ditModel) return;
@@ -620,6 +628,7 @@ async function getActiveModel(): Promise<string | null> {
  * This Gradio build often 404s /v1/init — do NOT hard-fail; boot config_path must match.
  */
 async function switchModelIfNeeded(ditModel: string): Promise<void> {
+  ditModel = toEngineModelId(ditModel);
   const activeModel = await getActiveModel();
   if (activeModel === ditModel) {
     console.log(`[Model] Already targeting '${ditModel}' (tracked active)`);
@@ -752,6 +761,9 @@ async function processGeneration(
 
   // Server-side safety: turbo + steps>8 → force non-turbo DiT (engine still has its own clamp)
   enforceNonTurboForHighSteps(params);
+  // Boundary: translate Phoenix IDs → engine acestep-* before Gradio/python
+  if (params.ditModel) params.ditModel = toEngineModelId(params.ditModel);
+  if (params.lmModel) params.lmModel = toEngineModelId(params.lmModel);
 
   // Guard: cover/audio2audio requires a source or audio codes
   if ((params.taskType === 'cover' || params.taskType === 'audio2audio') && !params.sourceAudioUrl && !params.audioCodes) {
@@ -781,11 +793,13 @@ async function processGenerationViaGradio(
   params: GenerationParams,
   job: ActiveJob,
 ): Promise<void> {
-  // Switch DiT model if a specific one was requested
+  // Switch DiT model if a specific one was requested (engine id only)
   if (params.ditModel) {
+    params.ditModel = toEngineModelId(params.ditModel);
     job.stage = `Loading model ${params.ditModel}...`;
     await switchModelIfNeeded(params.ditModel);
   }
+  if (params.lmModel) params.lmModel = toEngineModelId(params.lmModel);
 
   const client = await getGradioClient();
   const args = await buildGradioArgs(params);
