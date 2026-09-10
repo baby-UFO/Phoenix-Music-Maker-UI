@@ -317,8 +317,8 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
     } = req.body as GenerateBody;
 
     // Normalize client model ids to Phoenix for persistence / UI; engine maps via toEngineModelId
-    ditModel = ditModel ? toPhoenixModelId(ditModel) : ditModel;
-    lmModel = lmModel ? toPhoenixModelId(lmModel) : lmModel;
+    const ditModelPhoenix = ditModel ? toPhoenixModelId(ditModel) : ditModel;
+    const lmModelPhoenix = lmModel ? toPhoenixModelId(lmModel) : lmModel;
 
     if (!customMode && !songDescription) {
       res.status(400).json({ error: 'Song description required for simple mode' });
@@ -357,7 +357,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       lmTopP,
       lmNegativePrompt,
       lmBackend,
-      lmModel,
+      lmModel: lmModelPhoenix,
       referenceAudioUrl,
       sourceAudioUrl,
       referenceAudioTitle,
@@ -385,7 +385,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       trackName,
       completeTrackClasses,
       isFormatCaption,
-      ditModel,
+      ditModel: ditModelPhoenix,
     };
 
     // Create job record in database
