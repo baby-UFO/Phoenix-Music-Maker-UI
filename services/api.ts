@@ -813,3 +813,15 @@ export const trainingApi = {
   importDataset: (datasetType: string, token: string): Promise<{ status: string }> =>
     api('/api/training/import-dataset', { method: 'POST', body: { datasetType }, token }),
 };
+
+export interface NewsItem {
+  id: string;
+  date: string;
+  title: string;
+  body: string;
+  tags: string[];
+}
+
+export const newsApi = {
+  list: (): Promise<{ items: NewsItem[] }> => api('/api/news'),
+};

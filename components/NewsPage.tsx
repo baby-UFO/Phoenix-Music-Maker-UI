@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
-import { Newspaper, X, Star, Github } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Newspaper, X, Star, Github, Loader2 } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
-import newsData from '../data/news.json';
+import { newsApi, NewsItem } from '../services/api';
 import { lsGet, lsSet, storageKeys } from '../utils/phoenixStorage';
-
-interface NewsItem {
-  id: string;
-  date: string;
-  title: string;
-  body: string;
-  tags: string[];
-}
 
 export const NewsPage: React.FC = () => {
   const { t } = useI18n();
+  const [allNews, setAllNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dismissedNews, setDismissedNews] = useState<Set<string>>(() => {
     try {
       const stored = lsGet(storageKeys.dismissedNews.primary, storageKeys.dismissedNews.legacy);
@@ -23,7 +18,26 @@ export const NewsPage: React.FC = () => {
     }
   });
 
-  const allNews = newsData as NewsItem[];
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { items } = await newsApi.list();
+        if (!cancelled) setAllNews(items || []);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load news');
+          setAllNews([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const activeNews = allNews.filter(n => !dismissedNews.has(n.id));
   const dismissed = allNews.filter(n => dismissedNews.has(n.id));
 
@@ -57,6 +71,10 @@ export const NewsPage: React.FC = () => {
         return 'bg-green-500/15 text-green-600 dark:text-green-400';
       case 'bugfix':
         return 'bg-red-500/15 text-red-600 dark:text-red-400';
+      case 'style':
+        return 'bg-pink-500/15 text-pink-600 dark:text-pink-400';
+      case 'docs':
+        return 'bg-sky-500/15 text-sky-600 dark:text-sky-400';
       default:
         return 'bg-zinc-200 dark:bg-white/10 text-zinc-500 dark:text-zinc-400';
     }
@@ -74,7 +92,6 @@ export const NewsPage: React.FC = () => {
       `}
     >
       <div className="p-5 sm:p-6">
-        {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100 leading-snug">
@@ -100,22 +117,22 @@ export const NewsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Body */}
-        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-3 leading-relaxed">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-3 leading-relaxed whitespace-pre-line">
           {item.body}
         </p>
 
-        {/* Tags */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          {item.tags.map(tag => (
-            <span
-              key={tag}
-              className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${tagColor(tag)}`}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
+        {item.tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            {item.tags.map(tag => (
+              <span
+                key={tag}
+                className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${tagColor(tag)}`}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -123,18 +140,16 @@ export const NewsPage: React.FC = () => {
   return (
     <div className="flex-1 bg-white dark:bg-black overflow-y-auto p-6 lg:p-10 pb-32 transition-colors duration-300">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0">
             <Newspaper size={20} className="text-amber-600 dark:text-amber-400" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{t('news')}</h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Updates and announcements</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Daily summaries from GitHub</p>
           </div>
         </div>
 
-        {/* Star Repo */}
         <a
           href="https://github.com/baby-UFO/Phoenix-Music-Maker-UI"
           target="_blank"
@@ -152,8 +167,17 @@ export const NewsPage: React.FC = () => {
           </div>
         </a>
 
-        {/* Active News */}
-        {activeNews.length > 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 size={28} className="animate-spin text-amber-500" />
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading updates…</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-16">
+            <Newspaper size={48} className="mx-auto text-zinc-300 dark:text-zinc-600 mb-4" />
+            <p className="text-red-500 dark:text-red-400 text-sm">{error}</p>
+          </div>
+        ) : activeNews.length > 0 ? (
           <div className="space-y-4">
             {activeNews.map(item => renderCard(item, false))}
           </div>
@@ -164,8 +188,7 @@ export const NewsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Dismissed News */}
-        {dismissed.length > 0 && (
+        {!loading && !error && dismissed.length > 0 && (
           <div className="mt-10">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-4">
               Dismissed

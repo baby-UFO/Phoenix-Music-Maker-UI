@@ -25,6 +25,7 @@ import contactRoutes from './routes/contact.js';
 import referenceTrackRoutes from './routes/referenceTrack.js';
 import loraRoutes from './routes/lora.js';
 import trainingRoutes from './routes/training.js';
+import newsRoutes from './routes/news.js';
 import { pool } from './db/pool.js';
 import './db/migrate.js';
 
@@ -461,6 +462,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/reference-tracks', referenceTrackRoutes);
 app.use('/api/lora', loraRoutes);
 app.use('/api/training', trainingRoutes);
+app.use('/api/news', newsRoutes);
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
