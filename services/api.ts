@@ -340,6 +340,9 @@ export const generateApi = {
   getHistory: (token: string): Promise<{ jobs: GenerationJob[] }> =>
     api('/api/generate/history', { token }),
 
+  cancelJob: (jobId: string, token: string): Promise<{ id: string; status: string; cancelled?: boolean }> =>
+    api(`/api/generate/cancel/${jobId}`, { method: 'POST', token }),
+
   uploadAudio: async (file: File, token: string): Promise<{ url: string; key: string }> => {
     const formData = new FormData();
     formData.append('audio', file);

@@ -1,4 +1,4 @@
-﻿import { Router, Response } from 'express';
+import { Router, Response } from 'express';
 import multer from 'multer';
 import { existsSync, statSync, readFileSync } from 'fs';
 import path from 'path';
@@ -14,7 +14,7 @@ import {
   getAudioStream,
   discoverEndpoints,
   checkSpaceHealth,
-  cleanupJob,
+  cleanupJob, cancelEngineJob,
   getJobRawResponse,
   downloadAudioToBuffer,
   resolvePythonPath,
@@ -226,6 +226,7 @@ interface GenerateBody {
   repaintingEnd?: number;
   instruction?: string;
   audioCoverStrength?: number;
+  coverNoiseStrength?: number;
   taskType?: string;
   useAdg?: boolean;
   cfgIntervalStart?: number;
@@ -341,6 +342,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       repaintingEnd,
       instruction,
       audioCoverStrength,
+      coverNoiseStrength,
       taskType,
       useAdg,
       cfgIntervalStart,
@@ -413,6 +415,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       repaintingEnd,
       instruction,
       audioCoverStrength,
+      coverNoiseStrength,
       taskType,
       useAdg,
       cfgIntervalStart,
@@ -484,6 +487,11 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
     }
 
     // If job is still running, check Phoenix Engine status
+    if (job.status === 'cancelled') {
+      res.json({ id: job.id, status: 'failed', error: 'Cancelled', created_at: job.created_at });
+      return;
+    }
+
     if (['pending', 'queued', 'running'].includes(job.status) && job.acestep_task_id) {
       try {
         const aceStatus = await getJobStatus(job.acestep_task_id);
@@ -1080,6 +1088,41 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
   } catch (error) {
     console.error('[Format] Route error:', error);
     res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+
+// POST /api/generate/cancel/:jobId — cancel queued/running generation (no song created)
+router.post('/cancel/:jobId', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const jobResult = await pool.query(
+      `SELECT id, user_id, acestep_task_id, status FROM generation_jobs WHERE id = ?`,
+      [req.params.jobId]
+    );
+    if (jobResult.rows.length === 0) {
+      res.status(404).json({ error: 'Job not found' });
+      return;
+    }
+    const job = jobResult.rows[0];
+    if (job.user_id !== req.user!.id) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+    if (['succeeded', 'failed', 'cancelled'].includes(job.status)) {
+      res.json({ id: job.id, status: job.status, cancelled: job.status === 'cancelled' });
+      return;
+    }
+    if (job.acestep_task_id) {
+      cancelEngineJob(job.acestep_task_id);
+    }
+    await pool.query(
+      `UPDATE generation_jobs SET status = 'cancelled', error = 'Cancelled', updated_at = datetime('now') WHERE id = ? AND status IN ('pending', 'queued', 'running')`,
+      [req.params.jobId]
+    );
+    res.json({ id: job.id, status: 'cancelled', cancelled: true });
+  } catch (error) {
+    console.error('Cancel job error:', error);
+    res.status(500).json({ error: (error as Error).message || 'Cancel failed' });
   }
 });
 

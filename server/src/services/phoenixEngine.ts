@@ -403,7 +403,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     params.cfgIntervalEnd ?? 1.0,                                 // 23: CFG Interval End
     (params.shift != null
       ? params.shift
-      : (params.ditModel && /turbo/i.test(params.ditModel) ? 3.0 : 3.0)), // 24: Shift (match early working gigs default 3.0)
+      : (params.ditModel && /turbo/i.test(params.ditModel) ? 3.0 : 1.0)), // 24: Shift — non-turbo known-good is 1.0 (SFT+LoRA); turbo keeps 3.0
     params.inferMethod || 'ode',                                  // 25: Inference Method
     params.customTimesteps || '',                                 // 26: Custom Timesteps
     params.audioFormat || 'mp3',                                  // 27: Audio Format
@@ -582,6 +582,7 @@ interface ActiveJob {
   queuePosition?: number;
   progress?: number;
   stage?: string;
+  cancelled?: boolean;
 }
 
 const activeJobs = new Map<string, ActiveJob>();
@@ -757,7 +758,10 @@ async function processQueue(): Promise<void> {
     const jobId = jobQueue[0];
     const job = activeJobs.get(jobId);
 
-    if (job && job.status === 'queued') {
+    if (job && job.cancelled) {
+      job.status = 'failed';
+      job.error = 'Cancelled';
+    } else if (job && job.status === 'queued') {
       try {
         await processGeneration(jobId, job.params, job);
       } catch (error) {
@@ -811,6 +815,11 @@ async function processGeneration(
   params: GenerationParams,
   job: ActiveJob,
 ): Promise<void> {
+  if (job.cancelled) {
+    job.status = 'failed';
+    job.error = 'Cancelled';
+    return;
+  }
   job.status = 'running';
   job.stage = 'Starting generation...';
 
@@ -988,6 +997,11 @@ async function processGenerationViaGradio(
     ? actualDuration
     : (metas.duration || params.duration || 0);
 
+  if (job.cancelled) {
+    job.status = 'failed';
+    job.error = 'Cancelled';
+    return;
+  }
   job.status = 'succeeded';
   job.result = {
     audioUrls,
@@ -1140,6 +1154,11 @@ async function processGenerationViaPython(
 
     const finalDuration = actualDuration > 0 ? actualDuration : (params.duration && params.duration > 0 ? params.duration : 0);
 
+    if (job.cancelled) {
+      job.status = 'failed';
+      job.error = 'Cancelled';
+      return;
+    }
     job.status = 'succeeded';
     job.result = {
       audioUrls,
@@ -1249,6 +1268,13 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
     return {
       status: 'failed',
       error: 'Job not found',
+    };
+  }
+
+  if (job.cancelled) {
+    return {
+      status: 'failed',
+      error: 'Cancelled',
     };
   }
 
@@ -1362,6 +1388,24 @@ export async function downloadAudioToBuffer(remoteUrl: string): Promise<{ buffer
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   return { buffer, size: buffer.length };
+}
+
+/** Cancel a queued/running engine job. Queued jobs are dropped; running jobs discard their result. */
+export function cancelEngineJob(jobId: string): boolean {
+  const job = activeJobs.get(jobId);
+  if (!job) return false;
+  job.cancelled = true;
+  if (job.status === 'queued' || job.status === 'running') {
+    job.status = 'failed';
+    job.error = 'Cancelled';
+  }
+  const qIdx = jobQueue.indexOf(jobId);
+  if (qIdx >= 0) jobQueue.splice(qIdx, 1);
+  jobQueue.forEach((id, index) => {
+    const queuedJob = activeJobs.get(id);
+    if (queuedJob) queuedJob.queuePosition = index + 1;
+  });
+  return true;
 }
 
 export function cleanupJob(jobId: string): void {

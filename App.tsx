@@ -1221,6 +1221,27 @@ function AppContent() {
 
         for (const song of songsToDelete) {
           try {
+            // Queued/generating rows are temp client ids (job_<uuid>) — not DB songs yet.
+            if (song.isGenerating || song.id.startsWith('job_')) {
+              const localJobId = song.id.startsWith('job_') ? song.id.slice(4) : song.id;
+              let pollJobId: string | null = null;
+              activeJobsRef.current.forEach((data, jid) => {
+                if (data.tempId === song.id) pollJobId = jid;
+              });
+              try {
+                await generateApi.cancelJob(localJobId, token!);
+              } catch (cancelErr) {
+                console.warn('Cancel job failed (still removing from UI):', cancelErr);
+              }
+              if (pollJobId) {
+                cleanupJob(pollJobId, song.id);
+              } else {
+                setSongs(prev => prev.filter(s => s.id !== song.id));
+              }
+              succeeded.push(song.id);
+              continue;
+            }
+
             await songsApi.deleteSong(song.id, token!);
             succeeded.push(song.id);
           } catch (error) {
