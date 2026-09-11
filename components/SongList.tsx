@@ -6,7 +6,6 @@ import { useI18n } from '../context/I18nContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { AlbumCover } from './AlbumCover';
 import { songsApi } from '../services/api';
-import { getPhoenixModelLabel, toPhoenixModelId } from '../utils/phoenixModels';
 
 interface SongListProps {
     songs: Song[];
@@ -39,11 +38,6 @@ interface SongListProps {
 // Define Filter Types
 type FilterType = 'liked' | 'generating';
 
-// Map model ID to Phoenix display label
-const getModelDisplayName = (modelId?: string): string => {
-    if (!modelId) return 'Phoenix V15';
-    return getPhoenixModelLabel(toPhoenixModelId(modelId));
-};
 
 const createDragPreview = (element: HTMLElement) => {
     const clone = element.cloneNode(true) as HTMLElement;
@@ -626,9 +620,7 @@ const SongItem: React.FC<SongItemProps> = ({
                                 {song.title || (song.isGenerating ? (song.queuePosition ? "Queued..." : "Creating...") : "Untitled")}
                             </h3>
                         )}
-                        <span className="inline-flex items-center justify-center text-[9px] font-bold text-white bg-gradient-to-r from-pink-500 to-purple-500 px-1.5 py-0.5 rounded-sm shadow-sm" title={`DiT model: ${song.ditModel || 'undefined'}`}>
-                            {getModelDisplayName(song.ditModel)}
-                        </span>
+                        
                         {song.isPublic === false && (
                             <Lock size={12} className="text-zinc-400 dark:text-zinc-500" />
                         )}

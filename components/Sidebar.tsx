@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogIn, LogOut, Sun, Moon } from 'lucide-react';
+import { LogIn, LogOut } from 'lucide-react';
 import { View } from '../types';
 import { useI18n } from '../context/I18nContext';
 
@@ -147,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             `}
             title={theme === 'dark' ? t('lightMode') : t('darkMode')}
           >
-            <div className="flex-shrink-0">{theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}</div>
+            <div className="flex-shrink-0">{theme === 'dark' ? <img src="/icons/icon-sun.svg" alt="" className="w-6 h-6" draggable={false} /> : <img src="/icons/icon-moon.svg" alt="" className="w-6 h-6" draggable={false} />}</div>
             {isOpen && (
               <span className="text-sm font-medium whitespace-nowrap">
                 {theme === 'dark' ? t('lightMode') : t('darkMode')}
