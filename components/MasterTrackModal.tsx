@@ -121,6 +121,9 @@ export const MasterTrackModal: React.FC<MasterTrackModalProps> = ({ isOpen, song
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [abMode, setAbMode] = useState<'A' | 'B'>('A'); // A=original, B=processed preview approx
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [matcheringStatus, setMatcheringStatus] = useState<{ available: boolean; backend: string; detail: string } | null>(null);
+  const [qcMeters, setQcMeters] = useState<MasterMeters | null>(null);
+  const [qcBusy, setQcBusy] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -251,6 +254,104 @@ export const MasterTrackModal: React.FC<MasterTrackModalProps> = ({ isOpen, song
     bassDb, midDb, trebleDb, compThreshold, compRatio, stereoWidth,
   ]);
 
+  
+  const probeMatcheringStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/songs/master/matchering-status');
+      const data = await res.json();
+      setMatcheringStatus(data);
+    } catch {
+      setMatcheringStatus({ available: false, backend: 'unavailable', detail: 'Could not reach Matchering status endpoint' });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (refMatchEnabled) probeMatcheringStatus();
+  }, [refMatchEnabled, probeMatcheringStatus]);
+
+  const runLoudnessQc = useCallback(async () => {
+    if (!song?.id) return;
+    setQcBusy(true);
+    setError(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`/api/songs/${song.id}/loudness`, { headers, credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Loudness QC failed');
+      setQcMeters(data.meters || null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Loudness QC failed');
+    } finally {
+      setQcBusy(false);
+    }
+  }, [song?.id, token]);
+
+  /** OfflineAudioContext bounce for B preview (feature C) — processes full buffer offline. */
+  const playOfflineB = useCallback(async () => {
+    if (!song?.audioUrl) return;
+    setPreviewLoading(true);
+    try {
+      const ctx = audioCtxRef.current || new AudioContext();
+      audioCtxRef.current = ctx;
+      let buf = previewBuf;
+      if (!buf) {
+        const res = await fetch(song.audioUrl);
+        const arr = await res.arrayBuffer();
+        buf = await ctx.decodeAudioData(arr.slice(0));
+        setPreviewBuf(buf);
+      }
+      const offline = new OfflineAudioContext(buf.numberOfChannels, buf.length, buf.sampleRate);
+      const src = offline.createBufferSource();
+      src.buffer = buf;
+
+      const bassF = offline.createBiquadFilter();
+      bassF.type = 'lowshelf';
+      bassF.frequency.value = 100;
+      bassF.gain.value = bassDb;
+      const midF = offline.createBiquadFilter();
+      midF.type = 'peaking';
+      midF.frequency.value = 1000;
+      midF.Q.value = 1;
+      midF.gain.value = midDb;
+      const trebleF = offline.createBiquadFilter();
+      trebleF.type = 'highshelf';
+      trebleF.frequency.value = 8000;
+      trebleF.gain.value = trebleDb;
+      const comp = offline.createDynamicsCompressor();
+      comp.threshold.value = compThreshold;
+      comp.ratio.value = compRatio;
+      comp.attack.value = 0.015;
+      comp.release.value = 0.15;
+      const gain = offline.createGain();
+      gain.gain.value = Math.min(1.2, 0.85 + stereoWidth * 0.15);
+
+      src.connect(bassF);
+      bassF.connect(midF);
+      midF.connect(trebleF);
+      trebleF.connect(comp);
+      comp.connect(gain);
+      gain.connect(offline.destination);
+      src.start(0);
+      const rendered = await offline.startRendering();
+
+      stopPreview();
+      setAbMode('B');
+      if (ctx.state === 'suspended') await ctx.resume();
+      const play = ctx.createBufferSource();
+      play.buffer = rendered;
+      play.connect(ctx.destination);
+      play.onended = () => setPreviewPlaying(false);
+      sourceRef.current = play;
+      play.start(0);
+      setPreviewPlaying(true);
+    } catch (e) {
+      console.warn('Offline B preview failed', e);
+      await playAb('B');
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [song?.audioUrl, previewBuf, bassDb, midDb, trebleDb, compThreshold, compRatio, stereoWidth, stopPreview, playAb]);
   const canRender = Boolean(song?.id && song?.audioUrl);
 
   const handleRender = async () => {
@@ -432,6 +533,21 @@ export const MasterTrackModal: React.FC<MasterTrackModalProps> = ({ isOpen, song
           {/* A/B preview */}
           <div>
             <div className="text-xs font-semibold tracking-wide text-zinc-500 mb-2">A/B PREVIEW (Web Audio)</div>
+            <div className="flex flex-wrap gap-2 items-center mb-2">
+              <button
+                type="button"
+                disabled={!canRender || qcBusy}
+                onClick={runLoudnessQc}
+                className="px-3 py-1.5 rounded-lg text-sm border border-zinc-300 dark:border-white/10 text-zinc-700 dark:text-zinc-300"
+              >
+                {qcBusy ? 'Measuring…' : 'Analyze loudness (QC)'}
+              </button>
+              {qcMeters && (
+                <span className="text-[11px] font-mono text-zinc-400">
+                  I {qcMeters.input_i ?? '—'} · TP {qcMeters.input_tp ?? '—'} · LRA {qcMeters.input_lra ?? '—'}
+                </span>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2 items-center">
               <button
                 type="button"
@@ -448,7 +564,7 @@ export const MasterTrackModal: React.FC<MasterTrackModalProps> = ({ isOpen, song
               <button
                 type="button"
                 disabled={!canRender || previewLoading}
-                onClick={() => playAb('B')}
+                onClick={() => playOfflineB()}
                 className={`px-3 py-1.5 rounded-lg text-sm border ${
                   abMode === 'B' && previewPlaying
                     ? 'border-orange-500 bg-orange-500/20 text-white'
@@ -522,7 +638,7 @@ export const MasterTrackModal: React.FC<MasterTrackModalProps> = ({ isOpen, song
                 <div className="flex items-start gap-1.5 text-[10px] text-amber-500/90">
                   <Info size={12} className="mt-0.5 flex-shrink-0" />
                   <span>
-                    Sidecar not required for mastering. If Matchering is missing, render still succeeds with FFmpeg only.
+                    Sidecar not required for mastering. If Matchering is missing, render still succeeds with FFmpeg only.{matcheringStatus ? ` Status:  — ` : ''}
                     {refFile ? ` Reference: ${refFile.name}` : ''}
                   </span>
                 </div>
