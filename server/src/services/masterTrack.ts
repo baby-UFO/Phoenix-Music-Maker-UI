@@ -315,3 +315,24 @@ export async function isFfmpegAvailable(): Promise<boolean> {
     return false;
   }
 }
+
+/** Measure-only loudnorm pass (QC meters without writing a master). */
+export async function measureLoudness(audioUrlOrPath: string): Promise<LoudnormMeters | null> {
+  const src = await materializeAudioForExport(audioUrlOrPath);
+  const srcCleanup = src.cleanup ? src.path : null;
+  try {
+    const af = 'loudnorm=I=-14:TP=-1.0:LRA=11:print_format=json';
+    const pass = await runFfmpeg([
+      '-y', '-hide_banner', '-i', src.path,
+      '-af', af,
+      '-f', 'null',
+      process.platform === 'win32' ? 'NUL' : '/dev/null',
+    ]);
+    if (pass.code !== 0) return null;
+    return parseLoudnormJson(pass.stderr);
+  } finally {
+    if (srcCleanup) {
+      try { fs.unlinkSync(srcCleanup); } catch { /* ignore */ }
+    }
+  }
+}

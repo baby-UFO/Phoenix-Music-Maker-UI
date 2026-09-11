@@ -14,6 +14,15 @@ import {
   safeDownloadName,
   type ExportFormat,
 } from '../services/ffmpegExport.js';
+import {
+  masterTrack,
+  isFfmpegAvailable,
+  measureLoudness,
+  MASTER_PRESETS,
+  type MasterPresetId,
+  type MasterKnobParams,
+} from '../services/masterTrack.js';
+import { probeMatchering } from '../services/matcheringSidecar.js';
 
 const router = Router();
 
@@ -170,7 +179,7 @@ router.get('/:id/download', optionalAuthMiddleware, async (req: AuthenticatedReq
 
 
 
-// Master this track — FFmpeg EQ→acompressor→stereotools→alimiter→2-pass loudnorm
+// Master this track - FFmpeg EQ -> acompressor -> stereotools -> alimiter -> 2-pass loudnorm
 // Writes *_master.<ext> next to source (never overwrites source). Phoenix Music Maker.
 router.post('/:id/master', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -247,6 +256,54 @@ router.post('/:id/master', optionalAuthMiddleware, async (req: AuthenticatedRequ
 });
 
 // List master presets (no auth required)
+
+// Loudness QC meters (ffmpeg loudnorm JSON) — no file write
+router.get('/:id/loudness', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT s.audio_url, s.is_public, s.user_id FROM songs s WHERE s.id = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Song not found' });
+      return;
+    }
+    const song = result.rows[0];
+    if (!song.is_public && (!req.user || req.user.id !== song.user_id)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+    if (!song.audio_url) {
+      res.status(400).json({ error: 'Song has no audio' });
+      return;
+    }
+    const meters = await measureLoudness(song.audio_url);
+    if (!meters) {
+      res.status(500).json({ error: 'Loudness measure failed (is ffmpeg available?)' });
+      return;
+    }
+    res.json({ success: true, meters, engine: 'ffmpeg-loudnorm' });
+  } catch (error) {
+    console.error('Loudness QC error:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Loudness failed' });
+  }
+});
+
+// Matchering sidecar status (optional GPLv3 quarantine — never blocks core master)
+router.get('/master/matchering-status', async (_req, res: Response) => {
+  try {
+    const status = await probeMatchering();
+    res.json(status);
+  } catch (error) {
+    res.json({
+      available: false,
+      backend: 'unavailable',
+      detail: error instanceof Error ? error.message : 'probe failed',
+      license: 'GPLv3 (sidecar only — not part of Phoenix Music Maker core)',
+    });
+  }
+});
+
 router.get('/master/presets', (_req, res: Response) => {
   res.json({
     presets: Object.values(MASTER_PRESETS).map((p) => ({
