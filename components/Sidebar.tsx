@@ -62,17 +62,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Logo & Brand */}
       <div className="px-3 mb-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center cursor-pointer shadow-lg hover:scale-105 transition-transform flex-shrink-0"
+          <button
+            type="button"
+            className="w-14 h-14 rounded-full overflow-hidden cursor-pointer shadow-lg hover:scale-105 transition-transform flex-shrink-0 ring-1 ring-orange-500/40 p-0 border-0 bg-transparent"
             onClick={() => onNavigate('create')}
             title={t('phoenixMusicMaker')}
+            aria-label={t('phoenixMusicMaker')}
           >
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
+            <img
+              src="/phoenix-mark.svg"
+              alt=""
+              width={56}
+              height={56}
+              className="w-14 h-14 block"
+              draggable={false}
+            />
+          </button>
           {isOpen && (
             <span className="text-lg font-bold text-zinc-900 dark:text-white whitespace-nowrap">Phoenix Music Maker</span>
           )}
