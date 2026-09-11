@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Loader2 } from 'lucide-react';
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -573,7 +573,6 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   // Available models fetched from backend
   const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
   const [fetchedLmModels, setFetchedLmModels] = useState<{ name: string; is_preloaded: boolean; label?: string }[]>([]);
-  const [engineBootModel, setEngineBootModel] = useState<string | null>(null);
 
   const persistModel = useCallback((modelId: string) => {
     const phoenixId = toPhoenixModelId(modelId);
@@ -1035,9 +1034,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         if (models.length > 0) {
           setFetchedModels(models);
           if (data.bootModel || data.boot_model) {
-            setEngineBootModel(toPhoenixModelId(data.bootModel || data.boot_model));
           } else if (data.engineConfigPath) {
-            setEngineBootModel(toPhoenixModelId(data.engineConfigPath));
           }
           const preloaded = models.filter((m: any) => m.is_preloaded).map((m: any) => toPhoenixModelId(m.name));
           const savedRaw = lsGet(storageKeys.model.primary, storageKeys.model.legacy);
@@ -1935,14 +1932,14 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                   <button
                     type="button"
                     onClick={() => setVocalGender(vocalGender === 'male' ? '' : 'male')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('male')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setVocalGender(vocalGender === 'female' ? '' : 'female')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('female')}
                   </button>
@@ -2230,7 +2227,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                     onClick={() => setInstrumental(!instrumental)}
                     className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
                       instrumental
-                        ? 'bg-pink-600 text-white border-pink-500'
+                        ? 'bg-emerald-600 text-white border-emerald-500'
                         : 'bg-white dark:bg-suno-card border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10'
                     }`}
                   >
@@ -2343,7 +2340,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                       onClick={() => applyDeliveryPreset(preset.id)}
                       className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors border ${
                         preset.active
-                          ? 'bg-pink-600 text-white border-pink-500'
+                          ? 'bg-emerald-600 text-white border-emerald-500'
                           : 'bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-zinc-200 dark:border-white/5'
                       }`}
                     >
@@ -2376,17 +2373,6 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                     </button>
                   ))}
                 </div>
-                {engineBootModel && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-snug">
-                    Engine boot model: <span className="font-semibold">{getPhoenixModelLabel(engineBootModel)}</span>
-                    {" â€” "}DiT checkpoint is fixed at engine start (no live hot-swap). Fast/turbo needs a turbo boot; Quality/Max use base/sft with high steps on the current engine.
-                  </p>
-                )}
-                {!engineBootModel && (
-                  <p className="text-[10px] text-zinc-500 leading-snug">
-                    Quality/Max set base (or sft) + high DiT steps. Fast selects turbo in the UI, but the engine only runs turbo if started with that checkpoint (start-all defaults to base).
-                  </p>
-                )}
                 {/* Quick Tags */}
                 <div className="flex flex-wrap gap-2">
                   {musicTags.map(tag => (
@@ -2429,7 +2415,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               </div>
               <button
                 onClick={() => setInstrumental(!instrumental)}
-                className={`w-11 h-6 rounded-full flex items-center transition-colors duration-200 px-1 border border-zinc-200 dark:border-white/5 ${instrumental ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-black/40'}`}
+                className={`w-11 h-6 rounded-full flex items-center transition-colors duration-200 px-1 border border-zinc-200 dark:border-white/5 ${instrumental ? 'bg-emerald-600' : 'bg-zinc-300 dark:bg-black/40'}`}
               >
                 <div className={`w-4 h-4 rounded-full bg-white transform transition-transform duration-200 shadow-sm ${instrumental ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
@@ -2461,14 +2447,14 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                   <button
                     type="button"
                     onClick={() => setVocalGender(vocalGender === 'male' ? '' : 'male')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('male')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setVocalGender(vocalGender === 'female' ? '' : 'female')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('female')}
                   </button>
@@ -2686,7 +2672,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                     onClick={() => { setBulkCount(count); lsSet(storageKeys.bulkCount.primary, String(count), storageKeys.bulkCount.legacy); }}
                     className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                       bulkCount === count
-                        ? 'bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-md'
+                        ? 'bg-gradient-to-r from-[#1B4D3E] to-[#2F6B52] text-white shadow-md'
                         : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
                     }`}
                   >
@@ -3547,7 +3533,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       <div className="p-4 mt-auto sticky bottom-0 bg-zinc-50/95 dark:bg-suno-panel/95 backdrop-blur-sm z-10 border-t border-zinc-200 dark:border-white/5 space-y-3">
         <button
           onClick={handleGenerate}
-          className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110"
+          className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-[#1B4D3E] to-[#2F6B52] text-white shadow-lg hover:brightness-110"
           disabled={isGenerating || !isAuthenticated}
         >
           <Sparkles size={18} />

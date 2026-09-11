@@ -1,12 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <defs>
-    <radialGradient id="v" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#f472b6"/><stop offset="55%" stop-color="#db2777"/><stop offset="100%" stop-color="#831843"/>
-    </radialGradient>
-  </defs>
-  <rect width="32" height="32" rx="8" fill="#140814"/>
-  <circle cx="16" cy="16" r="10" fill="url(#v)"/>
-  <circle cx="16" cy="16" r="7.2" fill="none" stroke="#fda4d8" stroke-width="1.2" opacity=".7"/>
-  <circle cx="16" cy="16" r="3.2" fill="#1e0530"/>
-  <circle cx="16" cy="16" r="1.2" fill="#f9a8d4"/>
+  <rect width="32" height="32" rx="8" fill="#1a120c"/>
+  <!-- left book -->
+  <rect x="6" y="8" width="6.5" height="16" rx="1.2" fill="#8B5E3C"/>
+  <rect x="6.8" y="9" width="1.2" height="14" fill="#C4A484"/>
+  <!-- middle book -->
+  <rect x="12.5" y="7" width="7" height="18" rx="1.2" fill="#6B4423"/>
+  <rect x="13.4" y="8" width="1.3" height="16" fill="#D2B48C"/>
+  <!-- right book (tilted feel via offset) -->
+  <rect x="19.5" y="8.5" width="6.5" height="16" rx="1.2" fill="#A67B5B"/>
+  <rect x="20.3" y="9.5" width="1.2" height="14" fill="#E8D5B7"/>
+  <!-- shelf -->
+  <rect x="5" y="24.5" width="22" height="1.6" rx="0.6" fill="#5C4033"/>
 </svg>

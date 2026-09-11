@@ -60,28 +60,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         style={openWidthStyle}
       >
       {/* Logo & Brand */}
-      <div className="px-3 mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="w-16 h-16 rounded-full overflow-hidden cursor-pointer shadow-lg hover:scale-105 transition-transform flex-shrink-0 ring-1 ring-orange-500/40 p-0 border-0 bg-transparent"
-            onClick={() => onNavigate('create')}
-            title={t('phoenixMusicMaker')}
-            aria-label={t('phoenixMusicMaker')}
-          >
+      <div className="px-3 mb-8 flex items-start justify-between gap-2">
+        <button
+          type="button"
+          className="flex flex-col items-center gap-1 cursor-pointer hover:scale-105 transition-transform flex-shrink-0 p-0 border-0 bg-transparent"
+          onClick={() => onNavigate('create')}
+          title={t('phoenixMusicMaker')}
+          aria-label={t('phoenixMusicMaker')}
+        >
+          <span className="w-14 h-14 rounded-full overflow-hidden shadow-lg ring-1 ring-emerald-700/40 block">
             <img
               src="/phoenix-mark.gif"
               alt=""
-              width={64}
-              height={64}
-              className="w-16 h-16 block"
+              width={56}
+              height={56}
+              className="w-14 h-14 block"
               draggable={false}
             />
-          </button>
-          {isOpen && (
-            <span className="text-lg font-bold text-zinc-900 dark:text-white whitespace-nowrap">Phoenix Music Maker</span>
-          )}
-        </div>
+          </span>
+          <span className="text-[11px] font-extrabold tracking-[0.22em] leading-none bg-gradient-to-r from-amber-300 via-orange-400 to-rose-500 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(251,146,60,0.35)]">PMM</span>
+        </button>
         {/* Collapse/Expand Button */}
         {onToggle && (
           <button
@@ -166,7 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 `}
                 title={`${user.username} - ${t('settings')}`}
               >
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-white/20 overflow-hidden flex-shrink-0">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#2F6B52] to-[#1B4D3E] flex items-center justify-center text-white text-xs font-bold border border-emerald-700/40 overflow-hidden flex-shrink-0">
                   {user.avatar_url ? (
                     <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
                   ) : (
@@ -198,7 +196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               onClick={onLogin}
               className={`
-                w-full rounded-xl flex items-center gap-3 transition-all duration-200 text-zinc-500 dark:text-zinc-400 hover:text-pink-500 hover:bg-zinc-100 dark:hover:bg-white/5
+                w-full rounded-xl flex items-center gap-3 transition-all duration-200 text-zinc-500 dark:text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-white/5
                 ${isOpen ? 'px-3 py-2.5 justify-start' : 'aspect-square justify-center'}
               `}
               title={t('signIn')}
@@ -234,7 +232,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick, isExpan
     `}
     title={label}
   >
-    {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-pink-500 rounded-r-full"></div>}
+    {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-emerald-600 rounded-r-full"></div>}
     <div className="flex-shrink-0">{icon}</div>
     {isExpanded && (
       <span className="text-sm font-medium whitespace-nowrap">{label}</span>
