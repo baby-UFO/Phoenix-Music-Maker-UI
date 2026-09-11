@@ -9,6 +9,8 @@ import { fileURLToPath } from 'url';
 const __filename_init = fileURLToPath(import.meta.url);
 const __dirname_init = path.dirname(__filename_init);
 dotenv.config({ path: path.join(__dirname_init, '../../.env') });
+// Also load server/.env (Create / Phoenix Engine paths live here)
+dotenv.config({ path: path.join(__dirname_init, '../.env'), override: true });
 import cron from 'node-cron';
 import { config } from './config/index.js';
 import { runCleanupJob, cleanupDeletedSongs } from './services/cleanup.js';

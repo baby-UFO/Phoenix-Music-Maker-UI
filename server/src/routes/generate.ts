@@ -450,9 +450,9 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
     // Start generation (if this throws, catch marks the DB row failed — avoids eternal queued)
     const { jobId: hfJobId } = await generateMusicViaAPI(params);
 
-    // Update job with Phoenix Engine task ID
+    // Store engine task id but keep DB queued until status poll sees engine running
     await pool.query(
-      `UPDATE generation_jobs SET acestep_task_id = ?, status = 'running', updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE generation_jobs SET acestep_task_id = ?, status = 'queued', updated_at = datetime('now') WHERE id = ?`,
       [hfJobId, localJobId]
     );
 
@@ -1176,12 +1176,15 @@ router.post('/cancel/:jobId', authMiddleware, async (req: AuthenticatedRequest, 
       res.status(403).json({ error: 'Access denied' });
       return;
     }
+    // ALWAYS clear in-memory Gradio/queue state even if DB already terminal (ghost HOL bug)
+    if (job.acestep_task_id) {
+      try { cancelEngineJob(job.acestep_task_id); } catch (e) {
+        console.warn('cancelEngineJob on terminal/active job failed:', e);
+      }
+    }
     if (['succeeded', 'failed', 'cancelled'].includes(job.status)) {
       res.json({ id: job.id, status: job.status, cancelled: job.status === 'cancelled' });
       return;
-    }
-    if (job.acestep_task_id) {
-      cancelEngineJob(job.acestep_task_id);
     }
     await pool.query(
       `UPDATE generation_jobs SET status = 'cancelled', error = 'Cancelled', updated_at = datetime('now') WHERE id = ? AND status IN ('pending', 'queued', 'running')`,

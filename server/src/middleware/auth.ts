@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { pool } from '../db/pool.js';
+import { generateUUID } from '../db/sqlite.js';
 
 export interface AuthenticatedUser {
   id: string;
@@ -13,6 +14,27 @@ export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
 }
 
+const DEFAULT_USERNAME = process.env.PMM_DEFAULT_USERNAME || process.env.PHOENIX_DEFAULT_USERNAME || 'babyUFO';
+
+/** Resolve-or-create the single local OSS user. Never leaves product APIs without an identity. */
+export async function resolveLocalUser(): Promise<AuthenticatedUser> {
+  const existing = await pool.query(
+    'SELECT id, username, is_admin FROM users ORDER BY created_at ASC LIMIT 1'
+  );
+  if (existing.rows.length > 0) {
+    const u = existing.rows[0];
+    return { id: u.id, username: u.username, isAdmin: Boolean(u.is_admin) };
+  }
+  const userId = generateUUID();
+  const username = String(DEFAULT_USERNAME).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50) || 'babyUFO';
+  await pool.query(
+    `INSERT INTO users (id, username, is_admin, created_at, updated_at)
+     VALUES (?, ?, 1, datetime('now'), datetime('now'))`,
+    [userId, username]
+  );
+  return { id: userId, username, isAdmin: true };
+}
+
 export function authMiddleware(
   req: AuthenticatedRequest,
   res: Response,
@@ -20,8 +42,21 @@ export function authMiddleware(
 ): void {
   const authHeader = req.headers.authorization;
 
+  const finishWithLocal = () => {
+    resolveLocalUser()
+      .then((user) => {
+        req.user = user;
+        next();
+      })
+      .catch((err) => {
+        console.error('[Auth] resolveLocalUser failed:', err);
+        res.status(500).json({ error: 'Local user resolve failed' });
+      });
+  };
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'No token provided' });
+    // Local OSS: never 401 — inject default local user
+    finishWithLocal();
     return;
   }
 
@@ -32,7 +67,8 @@ export function authMiddleware(
     req.user = decoded;
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    // Invalid token: still fall back to local user (zero-auth)
+    finishWithLocal();
   }
 }
 
@@ -48,12 +84,19 @@ export function optionalAuthMiddleware(
     try {
       const decoded = jwt.verify(token, config.jwt.secret) as AuthenticatedUser;
       req.user = decoded;
+      next();
+      return;
     } catch {
-      // Token invalid, but continue without user
+      // fall through to local
     }
   }
 
-  next();
+  resolveLocalUser()
+    .then((user) => {
+      req.user = user;
+      next();
+    })
+    .catch(() => next());
 }
 
 export async function adminMiddleware(
@@ -61,31 +104,24 @@ export async function adminMiddleware(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'No token provided' });
-    return;
-  }
-
-  const token = authHeader.substring(7);
-
+  // Local OSS: treat default local user as admin-capable
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as AuthenticatedUser;
-
-    const result = await pool.query(
-      'SELECT is_admin FROM users WHERE id = ?',
-      [decoded.id]
-    );
-
-    if (result.rows.length === 0 || !result.rows[0].is_admin) {
-      res.status(403).json({ error: 'Admin access required' });
-      return;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.substring(7), config.jwt.secret) as AuthenticatedUser;
+        req.user = { ...decoded, isAdmin: true };
+        next();
+        return;
+      } catch {
+        /* fall through */
+      }
     }
-
-    req.user = { ...decoded, isAdmin: true };
+    const user = await resolveLocalUser();
+    req.user = { ...user, isAdmin: true };
     next();
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+  } catch (err) {
+    console.error('[Auth] adminMiddleware failed:', err);
+    res.status(500).json({ error: 'Local admin resolve failed' });
   }
 }

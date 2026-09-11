@@ -9,7 +9,14 @@ let connectionPromise: Promise<Client> | null = null;
  * Caches the connection for reuse across requests.
  */
 export async function getGradioClient(): Promise<Client> {
-  if (clientInstance) return clientInstance;
+  if (clientInstance) {
+    const closed = (clientInstance as { closed?: boolean }).closed;
+    if (closed === true) {
+      clientInstance = null;
+    } else {
+      return clientInstance;
+    }
+  }
   if (connectionPromise) return connectionPromise;
 
   connectionPromise = (async () => {
@@ -33,10 +40,20 @@ export async function getGradioClient(): Promise<Client> {
 
 /**
  * Reset the cached Gradio client, forcing a new connection on next use.
+ * MUST call Client.close() so hung predicts abort and Gradio frees the slot.
  */
 export function resetGradioClient(): void {
+  const prev = clientInstance;
   clientInstance = null;
   connectionPromise = null;
+  if (prev) {
+    try {
+      prev.close();
+      console.log('[Gradio] client closed on reset');
+    } catch (e) {
+      console.warn('[Gradio] close() on reset failed:', e);
+    }
+  }
 }
 
 /**
@@ -46,9 +63,9 @@ export function resetGradioClient(): void {
 export async function isGradioAvailable(): Promise<boolean> {
   const baseUrl = config.phoenixEngine.apiUrl;
   const candidates = [
-    `${baseUrl}/gradio_api/info`, // Gradio 5+
-    `${baseUrl}/info`,            // Gradio 4.x fallback
-    `${baseUrl}/`,                // Any HTTP response means server is up
+    `${baseUrl}/gradio_api/info`,
+    `${baseUrl}/info`,
+    `${baseUrl}/`,
   ];
 
   for (const url of candidates) {

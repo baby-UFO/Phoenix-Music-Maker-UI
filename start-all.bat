@@ -2,7 +2,11 @@
 title Phoenix Music Maker UI
 REM Phoenix Music Maker Complete Startup Script for Windows
 REM Starts Phoenix Engine + Backend + Frontend
-setlocal EnableDelayedExpansion
+setlocal
+
+REM Never open Chrome from start-all — babyUFO uses existing PMM tab
+set "PHOENIX_SKIP_BROWSER=1"
+set "PMM_SKIP_BROWSER=1" EnableDelayedExpansion
 
 echo ==================================
 echo   Phoenix Music Maker Complete Startup
@@ -42,7 +46,8 @@ echo [+] Phoenix Engine path: %ACESTEP_PATH%
 REM Prefer non-turbo DiT so inference steps >8 are not clamped to 8 by turbo.
 REM Must set BEFORE the ( ) block ? cmd expands %VAR% at parse time inside blocks.
 REM Prefer Phoenix checkpoint names when present.
-REM Full Monty for babyUFO: prefer XL SFT DiT + LM 4B, NEVER turbo. RTX 4080 16GB needs CPU offload.
+REM Full Monty for babyUFO: prefer XL SFT DiT + LM 4B, NEVER turbo. CPU offload FORBIDDEN (GPU only).
+if not "%PHOENIX_ENGINE_CONFIG_PATH%"=="" set "ACESTEP_CONFIG_PATH=%PHOENIX_ENGINE_CONFIG_PATH%"
 if "%ACESTEP_CONFIG_PATH%"=="" (
     if exist "%ACESTEP_PATH%\checkpoints\phoenix-v15-xl-sft\model.safetensors.index.json" (
         set "ACESTEP_CONFIG_PATH=phoenix-v15-xl-sft"
@@ -67,8 +72,11 @@ if "%ACESTEP_LM_MODEL_PATH%"=="" (
         set "ACESTEP_LM_MODEL_PATH=acestep-5Hz-lm-1.7B"
     )
 )
-if "%ACESTEP_OFFLOAD_TO_CPU%"=="" set "ACESTEP_OFFLOAD_TO_CPU=true"
-if "%ACESTEP_OFFLOAD_DIT_TO_CPU%"=="" set "ACESTEP_OFFLOAD_DIT_TO_CPU=true"
+REM babyUFO: NEVER CPU offload — keep DiT/LM on GPU
+set "ACESTEP_OFFLOAD_TO_CPU=false"
+set "PHOENIX_OFFLOAD_TO_CPU=false"
+set "ACESTEP_OFFLOAD_DIT_TO_CPU=false"
+set "PHOENIX_OFFLOAD_DIT_TO_CPU=false"
 if "%ACESTEP_FORCE_LM_4B%"=="" set "ACESTEP_FORCE_LM_4B=true"
 REM (removed stray closing paren that broke Full Monty startup)
 

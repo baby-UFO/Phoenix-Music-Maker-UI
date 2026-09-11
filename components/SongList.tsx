@@ -148,15 +148,17 @@ export const SongList: React.FC<SongListProps> = ({
             // 1. Search Logic
             const matchesSearch =
                 song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                song.style.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                song.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+                (song.style || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (song.tags || []).some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
 
             if (!matchesSearch) return false;
 
             // 2. Filter Logic
             if (activeFilters.size === 0) return true;
 
-            if (activeFilters.has('liked') && !likedSongIds.has(song.id)) return false;
+            if (      // Always show queued/generating workspace rows regardless of liked/other filters
+      if (song.isGenerating) return true;
+activeFilters.has('liked') && !likedSongIds.has(song.id)) return false;
             if (activeFilters.has('generating') && !song.isGenerating) return false;
 
             return true;

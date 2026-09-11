@@ -28,31 +28,49 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
 
   const isAuthenticated = !!user && !!token;
 
-  // Auto-login on mount: Try to get existing user from database
+  // Silent local identity on mount — never open a login wall on API blip
   useEffect(() => {
     async function initAuth(): Promise<void> {
+      const cachedToken = typeof localStorage !== 'undefined'
+        ? (localStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_LEGACY || ''))
+        : null;
+      const cachedUserRaw = typeof localStorage !== 'undefined'
+        ? (localStorage.getItem(USER_KEY) || localStorage.getItem(USER_LEGACY || ''))
+        : null;
+      if (cachedToken && cachedUserRaw) {
+        try {
+          const cachedUser = JSON.parse(cachedUserRaw) as User;
+          setToken(cachedToken);
+          setUser(cachedUser);
+        } catch { /* ignore bad cache */ }
+      }
+
       try {
-        // First, try auto-login from database (for local single-user app)
         const { user: userData, token: newToken } = await authApi.auto();
         setUser(userData);
         setToken(newToken);
-        lsSet(TOKEN_KEY, newToken, TOKEN_LEGACY);
-        lsSet(USER_KEY, JSON.stringify(userData), USER_LEGACY);
+        try {
+          localStorage.setItem(TOKEN_KEY, newToken);
+          localStorage.setItem(USER_KEY, JSON.stringify(userData));
+          if (TOKEN_LEGACY) localStorage.removeItem(TOKEN_LEGACY);
+          if (USER_LEGACY) localStorage.removeItem(USER_LEGACY);
+        } catch { /* ignore */ }
       } catch (error: unknown) {
-        // No user in database (404) or server error - that's okay
-        // Clear any stale localStorage data
-        const err = error as { message?: string };
-        if (err.message?.startsWith('404:')) {
-          // No user exists yet - frontend will show username setup
-          console.log('No user in database, need to set up username');
-        } else {
-          console.warn('Auto-login failed:', error);
+        console.warn('Auto-login failed (keeping cache if any):', error);
+        // Do NOT wipe cache / force UsernameModal — zero-auth OSS
+        if (!cachedToken) {
+          try {
+            const { user: userData, token: newToken } = await authApi.setup(
+              (typeof process !== 'undefined' && (process as { env?: Record<string, string> }).env?.PMM_DEFAULT_USERNAME) || 'babyUFO'
+            );
+            setUser(userData);
+            setToken(newToken);
+            localStorage.setItem(TOKEN_KEY, newToken);
+            localStorage.setItem(USER_KEY, JSON.stringify(userData));
+          } catch (setupErr) {
+            console.warn('Silent setup failed:', setupErr);
+          }
         }
-        // Clear stale data
-        setToken(null);
-        setUser(null);
-        lsRemove(TOKEN_KEY, TOKEN_LEGACY);
-        lsRemove(USER_KEY, USER_LEGACY);
       } finally {
         setIsLoading(false);
       }

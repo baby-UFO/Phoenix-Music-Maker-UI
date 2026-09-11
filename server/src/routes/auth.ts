@@ -3,7 +3,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
 import { generateUUID } from '../db/sqlite.js';
 import { config } from '../config/index.js';
-import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthenticatedRequest, resolveLocalUser } from '../middleware/auth.js';
 
 const jwtOptions = { expiresIn: config.jwt.expiresIn } as SignOptions;
 
@@ -20,16 +20,11 @@ function issueAccessToken(payload: { id: string; username: string }): string {
 // Auto-login: Get the default user from database (for local single-user app)
 router.get('/auto', async (_req: Request, res: Response) => {
   try {
-    // Get the first user from the database (local app typically has one user)
+    // Always ensure a local user exists (zero-auth OSS) — never 404
+    await resolveLocalUser();
     const result = await pool.query(
       'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users ORDER BY created_at ASC LIMIT 1'
     );
-
-    if (result.rows.length === 0) {
-      // No user exists yet - frontend should show username setup
-      res.status(404).json({ error: 'No user found' });
-      return;
-    }
 
     const user = result.rows[0];
 

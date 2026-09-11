@@ -1,5 +1,4 @@
 import React from 'react';
-import { LogIn, LogOut } from 'lucide-react';
 import { View } from '../types';
 import { useI18n } from '../context/I18nContext';
 
@@ -9,8 +8,6 @@ interface SidebarProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   user?: { username: string; isAdmin?: boolean; avatar_url?: string } | null;
-  onLogin?: () => void;
-  onLogout?: () => void;
   onOpenSettings?: () => void;
   isOpen?: boolean;
   onToggle?: () => void;
@@ -24,8 +21,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   theme,
   onToggleTheme,
   user,
-  onLogin,
-  onLogout,
   onOpenSettings,
   isOpen = true,
   onToggle,
@@ -153,60 +148,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </button>
 
-          {user ? (
-            <>
-              {/* User Settings */}
-              <button
-                onClick={onOpenSettings}
-                className={`
-                  w-full rounded-xl flex items-center gap-3 transition-all duration-200 text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5
-                  ${isOpen ? 'px-3 py-2.5 justify-start' : 'aspect-square justify-center'}
-                `}
-                title={`${user.username} - ${t('settings')}`}
-              >
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#2F6B52] to-[#1B4D3E] flex items-center justify-center text-white text-xs font-bold border border-emerald-700/40 overflow-hidden flex-shrink-0">
-                  {user.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
-                  ) : (
-                    user.username.charAt(0).toUpperCase()
-                  )}
-                </div>
-                {isOpen && (
-                  <span className="text-sm font-medium whitespace-nowrap truncate flex-1 text-left">
-                    {user.username}
-                  </span>
-                )}
-              </button>
-              {/* Logout */}
-              <button
-                onClick={onLogout}
-                className={`
-                  w-full rounded-xl flex items-center gap-3 transition-all duration-200 text-zinc-500 hover:text-red-500 hover:bg-red-500/10
-                  ${isOpen ? 'px-3 py-2.5 justify-start' : 'aspect-square justify-center'}
-                `}
-                title={t('signOut')}
-              >
-                <div className="flex-shrink-0"><LogOut size={20} /></div>
-                {isOpen && (
-                  <span className="text-sm font-medium whitespace-nowrap">{t('signOut')}</span>
-                )}
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={onLogin}
-              className={`
-                w-full rounded-xl flex items-center gap-3 transition-all duration-200 text-zinc-500 dark:text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-white/5
-                ${isOpen ? 'px-3 py-2.5 justify-start' : 'aspect-square justify-center'}
-              `}
-              title={t('signIn')}
-            >
-              <div className="flex-shrink-0"><LogIn size={20} /></div>
-              {isOpen && (
-                <span className="text-sm font-medium whitespace-nowrap">{t('signIn')}</span>
-              )}
-            </button>
-          )}
         </div>
       </nav>
       </div>

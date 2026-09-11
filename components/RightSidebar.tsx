@@ -71,7 +71,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
     const saveTitleEdit = async () => {
         if (!song) return;
         if (!token) {
-            setTitleError('Please sign in to rename.');
+            setTitleError('Rename unavailable.');
             return;
         }
         const trimmed = titleDraft.trim();

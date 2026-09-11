@@ -326,11 +326,7 @@ function AppContent() {
   };
 
   // Show username modal if not authenticated and not loading
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      setShowUsernameModal(true);
-    }
-  }, [authLoading, isAuthenticated]);
+  // Zero-auth: never open UsernameModal as a boot gate
 
   // Load Playlists
   useEffect(() => {
@@ -1010,9 +1006,9 @@ function AppContent() {
 
   // Handlers
   const handleGenerate = async (params: GenerationParams) => {
-    if (!isAuthenticated || !token) {
-      setShowUsernameModal(true);
-      return;
+    // Zero-auth: proceed even if token still loading; server resolves local user
+    if (!token) {
+      console.warn('Generate without token — relying on local zero-auth middleware');
     }
 
     setIsGenerating(true);
@@ -1025,7 +1021,7 @@ function AppContent() {
       id: tempId,
       title: params.title || 'Generating...',
       lyrics: '',
-      style: params.style,
+      style: params.style || params.songDescription || '',
       coverUrl: 'https://picsum.photos/200/200?blur=10',
       duration: '--:--',
       createdAt: new Date(),
@@ -1121,7 +1117,7 @@ function AppContent() {
 
   // Resume active jobs on refresh so progress keeps updating
   useEffect(() => {
-    if (!isAuthenticated || !token) return;
+    if (!token) return; // zero-auth: identity via token/cache; no login wall
 
     const resumeJobs = async () => {
       try {
@@ -1132,15 +1128,26 @@ function AppContent() {
         const jobsToResume = jobs.filter((job: any) => activeStatuses.has(job.status));
 
         if (jobsToResume.length === 0) {
-          // No active server jobs — clear ghost generating UI and durable map.
-          setSongs(prev => prev.filter(s => !s.isGenerating));
-          generatingJobsRef.current.clear();
-          if (activeJobsRef.current.size > 0) {
-            activeJobsRef.current.forEach(({ pollInterval }) => clearInterval(pollInterval));
-            activeJobsRef.current.clear();
-            setActiveJobCount(0);
+          // NEVER blanket-wipe all isGenerating (races fresh Create temp_* before history lists the job).
+          // Only drop tracked placeholders whose job ids are absent AND not in activeJobsRef.
+          const activeIds = new Set<string>([...activeJobsRef.current.keys()]);
+          for (const jid of [...generatingJobsRef.current.keys()]) {
+            if (!activeIds.has(jid)) {
+              generatingJobsRef.current.delete(jid);
+            }
           }
-          setIsGenerating(false);
+          setSongs(prev => prev.filter(s => {
+            if (!s.isGenerating) return true;
+            if (s.id.startsWith('temp_')) return true; // keep fresh Create rows
+            if (s.id.startsWith('job_')) {
+              const jid = s.id.slice(4);
+              return activeIds.has(jid) || generatingJobsRef.current.has(jid);
+            }
+            return true;
+          }));
+          if (activeJobsRef.current.size === 0 && generatingJobsRef.current.size === 0) {
+            setIsGenerating(false);
+          }
           return;
         }
 
@@ -1189,6 +1196,8 @@ function AppContent() {
     };
 
     resumeJobs();
+    const hydrateTimer = setInterval(() => { resumeJobs(); }, 4500);
+    return () => clearInterval(hydrateTimer);
   }, [isAuthenticated, token, beginPollingJob]);
 
   const togglePlay = () => {
@@ -1741,9 +1750,7 @@ function AppContent() {
           theme={theme}
           onToggleTheme={toggleTheme}
           user={user}
-          onLogin={() => setShowUsernameModal(true)}
-          onLogout={logout}
-          onOpenSettings={() => setShowSettingsModal(true)}
+                              onOpenSettings={() => setShowSettingsModal(true)}
           isOpen={showLeftSidebar}
           onToggle={handleLeftSidebarToggle}
           width={sidebarWidth}
@@ -1831,7 +1838,7 @@ function AppContent() {
         onClose={() => { setIsMasterModalOpen(false); setSongForMaster(null); }}
       />
       <UsernameModal
-        isOpen={showUsernameModal}
+        isOpen={false}
         onSubmit={handleUsernameSubmit}
       />
       <SettingsModal

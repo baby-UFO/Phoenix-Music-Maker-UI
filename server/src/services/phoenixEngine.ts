@@ -607,6 +607,38 @@ setInterval(() => cleanupOldJobs(3600000), 600000);
 const jobQueue: string[] = [];
 let isProcessingQueue = false;
 
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+  onTimeout?: () => void,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          try { onTimeout?.(); } catch { /* ignore */ }
+          reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`));
+        }, ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function gradioPredictTimeoutMs(params: GenerationParams): number {
+  const envMs = Number(process.env.PHOENIX_GRADIO_PREDICT_TIMEOUT_MS || process.env.ACESTEP_GRADIO_PREDICT_TIMEOUT_MS || 0);
+  if (Number.isFinite(envMs) && envMs > 0) return envMs;
+  const duration = Number(params.duration) || 120;
+  const steps = Number(params.inferenceSteps) || 8;
+  // Base 3min + duration*2s + steps*5s, clamp 3–20 min
+  return Math.min(1_200_000, Math.max(180_000, 180_000 + duration * 2000 + steps * 5000));
+}
+
+
 // Health check - verify Gradio app is reachable
 export async function checkSpaceHealth(): Promise<boolean> {
   return isGradioAvailable();
@@ -739,6 +771,19 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
   }
 
   console.log(`[Model] Boot DiT mismatch (status=${boot ?? 'none'}, wanted=${wanted}) — restarting Phoenix Engine...`);
+
+  // Fail in-flight jobs + free Gradio slot BEFORE taskkill (orphaned await wedges HOL otherwise)
+  for (const [jid, j] of activeJobs.entries()) {
+    if (j.status === 'queued' || j.status === 'running') {
+      j.status = 'failed';
+      j.error = 'Phoenix Engine restarting for DiT config switch';
+      j.stage = 'Failed';
+      j.cancelled = true;
+    }
+  }
+  jobQueue.length = 0;
+  isProcessingQueue = false;
+  resetGradioClient();
 
   try {
     const out = execSync('netstat -ano', { encoding: 'utf-8' });
@@ -882,34 +927,42 @@ async function processQueue(): Promise<void> {
   if (isProcessingQueue) return;
   isProcessingQueue = true;
 
-  while (jobQueue.length > 0) {
-    const jobId = jobQueue[0];
-    const job = activeJobs.get(jobId);
+  try {
+    while (jobQueue.length > 0) {
+      const jobId = jobQueue[0];
+      const job = activeJobs.get(jobId);
 
-    if (job && job.cancelled) {
-      job.status = 'failed';
-      job.error = 'Cancelled';
-    } else if (job && job.status === 'queued') {
-      try {
-        await processGeneration(jobId, job.params, job);
-      } catch (error) {
-        console.error(`Queue processing error for ${jobId}:`, error);
+      if (job && job.cancelled) {
+        job.status = 'failed';
+        job.error = job.error || 'Cancelled';
+        job.stage = 'Failed';
+      } else if (job && (job.status === 'queued' || job.status === 'running')) {
+        try {
+          await processGeneration(jobId, job.params, job);
+        } catch (error) {
+          console.error(`Queue processing error for ${jobId}:`, error);
+          if (job.status === 'queued' || job.status === 'running') {
+            job.status = 'failed';
+            job.error = error instanceof Error ? error.message : 'Queue processing failed';
+            job.stage = 'Failed';
+          }
+        }
       }
+
+      // Remove by jobId (ensure-dit may clear+requeue; never blind-shift wrong head)
+      const idx = jobQueue.indexOf(jobId);
+      if (idx >= 0) jobQueue.splice(idx, 1);
+
+      jobQueue.forEach((id, index) => {
+        const queuedJob = activeJobs.get(id);
+        if (queuedJob) {
+          queuedJob.queuePosition = index + 1;
+        }
+      });
     }
-
-    // Remove from queue after processing (whether success or failure)
-    jobQueue.shift();
-
-    // Update queue positions for remaining jobs
-    jobQueue.forEach((id, index) => {
-      const queuedJob = activeJobs.get(id);
-      if (queuedJob) {
-        queuedJob.queuePosition = index + 1;
-      }
-    });
+  } finally {
+    isProcessingQueue = false;
   }
-
-  isProcessingQueue = false;
 }
 
 // Submit generation job to queue
@@ -1040,9 +1093,26 @@ async function processGenerationViaGradio(
   } catch { /* ignore */ }
 
   job.stage = 'Generating music via Gradio...';
+  job.status = 'running';
 
-  // predict() blocks until generation is complete
-  const result = await client.predict('/generation_wrapper', args);
+  // predict() blocks until generation is complete — MUST timeout + Client.close on stall
+  const predictMs = gradioPredictTimeoutMs(params);
+  let result;
+  try {
+    result = await withTimeout(
+      client.predict('/generation_wrapper', args),
+      predictMs,
+      `Gradio predict ${jobId}`,
+      () => {
+        console.log(`[Gradio] aborted predict for ${jobId}, client closed`);
+        resetGradioClient();
+      },
+    );
+  } catch (predictErr) {
+    console.error(`[Gradio] predict failed/timeout for ${jobId}:`, predictErr);
+    resetGradioClient();
+    throw predictErr;
+  }
   const data = result.data as unknown[];
 
   if (!Array.isArray(data) || data.length === 0) {
@@ -1521,11 +1591,17 @@ export async function downloadAudioToBuffer(remoteUrl: string): Promise<{ buffer
 /** Cancel a queued/running engine job. Queued jobs are dropped; running jobs discard their result. */
 export function cancelEngineJob(jobId: string): boolean {
   const job = activeJobs.get(jobId);
-  if (!job) return false;
+  if (!job) {
+    // Still try to free Gradio slot if a ghost cancel arrives
+    resetGradioClient();
+    return false;
+  }
+  const wasRunning = job.status === 'running' || jobQueue[0] === jobId;
   job.cancelled = true;
   if (job.status === 'queued' || job.status === 'running') {
     job.status = 'failed';
     job.error = 'Cancelled';
+    job.stage = 'Failed';
   }
   const qIdx = jobQueue.indexOf(jobId);
   if (qIdx >= 0) jobQueue.splice(qIdx, 1);
@@ -1533,6 +1609,12 @@ export function cancelEngineJob(jobId: string): boolean {
     const queuedJob = activeJobs.get(id);
     if (queuedJob) queuedJob.queuePosition = index + 1;
   });
+  if (wasRunning) {
+    // Abort hung predict socket so processQueue can drain followers
+    console.log(`[Gradio] cancelEngineJob ${jobId}: closing client to free slot`);
+    resetGradioClient();
+    isProcessingQueue = false;
+  }
   return true;
 }
 
