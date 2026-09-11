@@ -135,9 +135,9 @@ echo   Close the terminal windows to stop all services.
 echo.
 echo ==================================
 echo.
-echo Opening browser...
+echo Refreshing Phoenix Music Maker UI if open (or opening once)...
 timeout /t 3 /nobreak >nul
-start http://localhost:3000
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\refresh-or-open-ui.ps1"
 
 echo.
 echo Press any key to close this window (services will keep running)
