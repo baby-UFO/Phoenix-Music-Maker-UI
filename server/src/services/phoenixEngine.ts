@@ -813,19 +813,11 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
   }
   const statusBoot = readEngineBootConfig();
   const liveBoot = await readLiveEngineConfigPath();
-  // Never trust status JSON alone — live PID may still be sft while status says turbo
-  if (liveBoot === phoenixId) {
-    if (statusBoot !== phoenixId) {
-      writeEngineBootConfig(phoenixId, /turbo/i.test(phoenixId));
-    }
-    lastRequestedDitModel = phoenixId;
-    return { restarted: false, configPath: phoenixId };
-  }
-  if (liveBoot && liveBoot !== phoenixId) {
-    console.log(`[Model] Live engine config_path=${liveBoot} (status=${statusBoot ?? 'none'}) ≠ ${phoenixId} — forcing restart`);
-  } else if (!liveBoot && statusBoot === phoenixId) {
-    console.log(`[Model] Status says ${phoenixId} but live config unknown — forcing restart to be sure`);
-  }
+  // Brand: Quality chip ALWAYS kills :8001 then boots selected DiT — never skip on status JSON
+  // (status lied turbo while live process was still phoenix-v15-sft)
+  console.log(
+    `[Model] ensure-dit ALWAYS restart → ${phoenixId} (live=${liveBoot ?? 'none'}, status=${statusBoot ?? 'none'})`,
+  );
 
   if (!isCheckpointOnDisk(phoenixId)) {
     throw new Error(
