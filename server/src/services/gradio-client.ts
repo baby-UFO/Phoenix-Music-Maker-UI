@@ -3,6 +3,41 @@ import { config } from '../config/index.js';
 
 let clientInstance: Client | null = null;
 let connectionPromise: Promise<Client> | null = null;
+/** Client currently mid-predict (may differ from cached singleton). */
+let inFlightClient: Client | null = null;
+
+type GradioClientExtras = Client & {
+  closed?: boolean;
+  abort_controller?: AbortController;
+  stream_instance?: { close?: () => void };
+};
+
+/** Abort streams + close so Gradio frees the slot (ESTABLISHED sockets). */
+export function hardClose(c: Client | null): void {
+  if (!c) return;
+  const x = c as GradioClientExtras;
+  try { x.abort_controller?.abort(); } catch { /* ignore */ }
+  try { x.stream_instance?.close?.(); } catch { /* ignore */ }
+  try { c.close(); } catch (e) { console.warn('[Gradio] hardClose', e); }
+}
+
+/** Register the client about to call predict (in-flight socket tracking). */
+export function setInFlightGradioClient(c: Client | null): void {
+  inFlightClient = c;
+}
+
+/**
+ * Hard-close cached + in-flight clients. Use on cancel even if job missing.
+ */
+export function forceCloseGradioSockets(): void {
+  const a = clientInstance;
+  const b = inFlightClient;
+  clientInstance = null;
+  connectionPromise = null;
+  inFlightClient = null;
+  hardClose(a);
+  if (b && b !== a) hardClose(b);
+}
 
 /**
  * Get a lazy-initialized Gradio client connected to the Phoenix Engine Gradio app.
@@ -10,7 +45,7 @@ let connectionPromise: Promise<Client> | null = null;
  */
 export async function getGradioClient(): Promise<Client> {
   if (clientInstance) {
-    const closed = (clientInstance as { closed?: boolean }).closed;
+    const closed = (clientInstance as GradioClientExtras).closed;
     if (closed === true) {
       clientInstance = null;
     } else {
@@ -40,20 +75,11 @@ export async function getGradioClient(): Promise<Client> {
 
 /**
  * Reset the cached Gradio client, forcing a new connection on next use.
- * MUST call Client.close() so hung predicts abort and Gradio frees the slot.
+ * MUST hard-close cached + in-flight so hung predicts abort and Gradio frees the slot.
  */
 export function resetGradioClient(): void {
-  const prev = clientInstance;
-  clientInstance = null;
-  connectionPromise = null;
-  if (prev) {
-    try {
-      prev.close();
-      console.log('[Gradio] client closed on reset');
-    } catch (e) {
-      console.warn('[Gradio] close() on reset failed:', e);
-    }
-  }
+  forceCloseGradioSockets();
+  console.log('[Gradio] client closed on reset');
 }
 
 /**

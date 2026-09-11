@@ -452,7 +452,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
 
     // Store engine task id but keep DB queued until status poll sees engine running
     await pool.query(
-      `UPDATE generation_jobs SET acestep_task_id = ?, status = 'queued', updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE generation_jobs SET phoenix_task_id = ?, status = 'queued', updated_at = datetime('now') WHERE id = ?`,
       [hfJobId, localJobId]
     );
 
@@ -468,7 +468,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       try {
         await pool.query(
           `UPDATE generation_jobs SET status = 'failed', error = ?, updated_at = datetime('now')
-           WHERE id = ? AND status IN ('pending', 'queued', 'running') AND (acestep_task_id IS NULL OR acestep_task_id = '')`,
+           WHERE id = ? AND status IN ('pending', 'queued', 'running') AND (phoenix_task_id IS NULL OR phoenix_task_id = '')`,
           [message, localJobId]
         );
       } catch (markErr) {
@@ -482,7 +482,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
 router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const jobResult = await pool.query(
-      `SELECT id, user_id, acestep_task_id, status, params, result, error, created_at
+      `SELECT id, user_id, phoenix_task_id, status, params, result, error, created_at
        FROM generation_jobs
        WHERE id = ?`,
       [req.params.jobId]
@@ -507,14 +507,14 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
     }
 
     // Fail-to-start: queued/running with no engine task id for >15s
-    if (['pending', 'queued', 'running'].includes(job.status) && !job.acestep_task_id) {
+    if (['pending', 'queued', 'running'].includes(job.status) && !job.phoenix_task_id) {
       const createdMs = job.created_at ? new Date(job.created_at).getTime() : 0;
       const ageMs = createdMs ? Date.now() - createdMs : 0;
       if (ageMs > 15_000) {
         const failMsg = 'Failed to start Phoenix Engine task';
         await pool.query(
           `UPDATE generation_jobs SET status = 'failed', error = ?, updated_at = datetime('now')
-           WHERE id = ? AND status IN ('pending', 'queued', 'running') AND (acestep_task_id IS NULL OR acestep_task_id = '')`,
+           WHERE id = ? AND status IN ('pending', 'queued', 'running') AND (phoenix_task_id IS NULL OR phoenix_task_id = '')`,
           [failMsg, req.params.jobId]
         );
         res.json({ id: job.id, status: 'failed', error: failMsg, created_at: job.created_at });
@@ -530,9 +530,30 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
       return;
     }
 
-    if (['pending', 'queued', 'running'].includes(job.status) && job.acestep_task_id) {
+    if (['pending', 'queued', 'running'].includes(job.status) && job.phoenix_task_id) {
       try {
-        const aceStatus = await getJobStatus(job.acestep_task_id);
+        const aceStatus = await getJobStatus(job.phoenix_task_id);
+
+        // Map-miss from getJobStatus is NOT a real engine failure during early life of a job
+        // (in-memory map can lag / restart). Soft-running until ~120s.
+        if (
+          aceStatus.status === 'failed' &&
+          aceStatus.error === 'Job not found' &&
+          ['queued', 'running', 'pending'].includes(job.status)
+        ) {
+          const createdMs = job.created_at ? new Date(job.created_at).getTime() : 0;
+          const ageMs = createdMs ? Date.now() - createdMs : 0;
+          if (ageMs < 120_000) {
+            res.json({
+              jobId: req.params.jobId,
+              status: job.status === 'pending' ? 'queued' : job.status,
+              queuePosition: 1,
+              stage: 'Starting...',
+              created_at: job.created_at,
+            });
+            return;
+          }
+        }
 
         if (aceStatus.status !== job.status) {
           // Use optimistic lock: only update if status hasn't changed (prevents duplicate song creation)
@@ -630,7 +651,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
             }
 
             aceStatus.result.audioUrls = localPaths;
-            cleanupJob(job.acestep_task_id);
+            cleanupJob(job.phoenix_task_id);
           }
         }
 
@@ -717,7 +738,7 @@ router.get('/audio', async (req, res: Response) => {
 router.get('/history', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT id, acestep_task_id, status, params, result, error, created_at
+      `SELECT id, phoenix_task_id, status, params, result, error, created_at
        FROM generation_jobs
        WHERE user_id = ?
        ORDER BY created_at DESC
@@ -1164,7 +1185,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
 router.post('/cancel/:jobId', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const jobResult = await pool.query(
-      `SELECT id, user_id, acestep_task_id, status FROM generation_jobs WHERE id = ?`,
+      `SELECT id, user_id, phoenix_task_id, status FROM generation_jobs WHERE id = ?`,
       [req.params.jobId]
     );
     if (jobResult.rows.length === 0) {
@@ -1177,8 +1198,8 @@ router.post('/cancel/:jobId', authMiddleware, async (req: AuthenticatedRequest, 
       return;
     }
     // ALWAYS clear in-memory Gradio/queue state even if DB already terminal (ghost HOL bug)
-    if (job.acestep_task_id) {
-      try { cancelEngineJob(job.acestep_task_id); } catch (e) {
+    if (job.phoenix_task_id) {
+      try { cancelEngineJob(job.phoenix_task_id); } catch (e) {
         console.warn('cancelEngineJob on terminal/active job failed:', e);
       }
     }

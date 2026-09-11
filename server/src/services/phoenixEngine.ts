@@ -20,7 +20,7 @@ function getAudioDuration(filePath: string): number {
 }
 import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
-import { getGradioClient, resetGradioClient, isGradioAvailable } from './gradio-client.js';
+import { getGradioClient, resetGradioClient, isGradioAvailable, setInFlightGradioClient, forceCloseGradioSockets } from './gradio-client.js';
 import { toEngineModelId, toPhoenixModelId } from '../utils/phoenixModels.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1050,6 +1050,7 @@ async function processGenerationViaGradio(
   if (params.lmModel) params.lmModel = toEngineModelId(params.lmModel);
 
   const client = await getGradioClient();
+  setInFlightGradioClient(client);
   const args = await buildGradioArgs(params);
 
   const caption = params.style || 'pop music';
@@ -1110,9 +1111,11 @@ async function processGenerationViaGradio(
     );
   } catch (predictErr) {
     console.error(`[Gradio] predict failed/timeout for ${jobId}:`, predictErr);
+    setInFlightGradioClient(null);
     resetGradioClient();
     throw predictErr;
   }
+  setInFlightGradioClient(null);
   const data = result.data as unknown[];
 
   if (!Array.isArray(data) || data.length === 0) {
@@ -1591,12 +1594,18 @@ export async function downloadAudioToBuffer(remoteUrl: string): Promise<{ buffer
 /** Cancel a queued/running engine job. Queued jobs are dropped; running jobs discard their result. */
 export function cancelEngineJob(jobId: string): boolean {
   const job = activeJobs.get(jobId);
+  // ALWAYS hard-close Gradio sockets (ghost ESTABLISHED after cancel / missing job)
+  console.log(`[Gradio] hard-closed on cancel ${jobId}`);
+  forceCloseGradioSockets();
+  resetGradioClient();
+  isProcessingQueue = false;
+
   if (!job) {
-    // Still try to free Gradio slot if a ghost cancel arrives
-    resetGradioClient();
+    if (jobQueue.length > 0) {
+      void processQueue();
+    }
     return false;
   }
-  const wasRunning = job.status === 'running' || jobQueue[0] === jobId;
   job.cancelled = true;
   if (job.status === 'queued' || job.status === 'running') {
     job.status = 'failed';
@@ -1609,11 +1618,8 @@ export function cancelEngineJob(jobId: string): boolean {
     const queuedJob = activeJobs.get(id);
     if (queuedJob) queuedJob.queuePosition = index + 1;
   });
-  if (wasRunning) {
-    // Abort hung predict socket so processQueue can drain followers
-    console.log(`[Gradio] cancelEngineJob ${jobId}: closing client to free slot`);
-    resetGradioClient();
-    isProcessingQueue = false;
+  if (jobQueue.length > 0) {
+    void processQueue();
   }
   return true;
 }
