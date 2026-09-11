@@ -561,12 +561,9 @@ const SongItem: React.FC<SongItemProps> = ({
                             <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
                             <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.4s' }}></div>
                             <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.1s' }}></div>
-                        </div>
-                        {song.queuePosition ? (
+                        </div>                        {song.queuePosition ? (
                             <span className="text-[10px] font-medium text-amber-400">Queue #{song.queuePosition}</span>
-                        ) : (
-                            <span className="text-[10px] font-medium text-emerald-400">Creating…</span>
-                        )}
+                        ) : null}
                     </div>
                 ) : (
                     <div
