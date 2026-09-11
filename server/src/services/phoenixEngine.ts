@@ -766,8 +766,8 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
     ACESTEP_CONFIG_PATH: phoenixId,
     PHOENIX_ENGINE_CONFIG_PATH: phoenixId,
     ACESTEP_FORCE_LM_4B: 'true',
-    ACESTEP_OFFLOAD_TO_CPU: 'true',
-    ACESTEP_OFFLOAD_DIT_TO_CPU: 'true',
+    ACESTEP_OFFLOAD_TO_CPU: 'false',
+    ACESTEP_OFFLOAD_DIT_TO_CPU: 'false',
   };
   const tryIds = [phoenixId, toEngineModelId(phoenixId), toPhoenixModelId(phoenixId)];
   for (const id of tryIds) {
