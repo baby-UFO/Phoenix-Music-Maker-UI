@@ -268,7 +268,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         const stepsFor = (p: 'fast' | 'quality' | 'max') => (p === 'fast' ? 50 : p === 'quality' ? 100 : 200);
         const expected = stepsFor(preset);
         const steps = typeof parsed.inferenceSteps === 'number' ? parsed.inferenceSteps : expected;
-        // First run: sync steps to preset; orphaned 200 with quality/null/fast → Quality→100
+        // First run: sync steps to preset; orphaned 200 with quality/null/fast -> Quality->100
         if (firstRun) {
           if (steps === 200 && preset !== 'max') {
             parsed.qualityPreset = 'quality';
@@ -424,7 +424,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           .replace(/^\s*,\s*|\s*,\s*$/g, '')
           .replace(/\s{2,}/g, ' ')
           .trim();
-        // Soft-rewrite RAPPER → singer timbre wording when present
+        // Soft-rewrite RAPPER -> singer timbre wording when present
         base = base
           .replace(/\bmale RAPPER timbre\b/gi, 'male singing timbre')
           .replace(/\bRAPPER timbre\b/gi, 'singing timbre')
@@ -659,7 +659,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       setSelectedModel(phoenixNext);
       lsSet(storageKeys.model.primary, phoenixNext, storageKeys.model.legacy);
       setUseAdg(true);
-      console.log(`[CreatePanel] inferenceSteps=${steps} on turbo '${currentModel}' → auto-switch to '${next}'`);
+      console.log(`[CreatePanel] inferenceSteps=${steps} on turbo '${currentModel}' -> auto-switch to '${next}'`);
     }
     return next;
   }, [availableModels, preferNonTurboModel]);
@@ -793,7 +793,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     previousModelRef.current = selectedModel;
   }, [selectedModel, loraLoaded]);
 
-  // Prefer real multi-step diffusion: turbo + steps>8 → auto-switch to base/sft
+  // Prefer real multi-step diffusion: turbo + steps>8 -> auto-switch to base/sft
   useEffect(() => {
     switchToNonTurboForHighSteps(inferenceSteps, selectedModel);
   }, [inferenceSteps, selectedModel, switchToNonTurboForHighSteps]);
@@ -1837,7 +1837,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                             if (inferenceSteps <= TURBO_INFER_STEPS_MAX) setInferenceSteps(20);
                             setUseAdg(true);
                           } else if (inferenceSteps > TURBO_INFER_STEPS_MAX) {
-                            // Turbo engine clamps >8 → 8; keep UI honest
+                            // Turbo engine clamps >8 -> 8; keep UI honest
                             setInferenceSteps(TURBO_INFER_STEPS_MAX);
                           }
                           setShowModelMenu(false);
@@ -2706,7 +2706,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                   ? 50
                   : qualityPreset === 'max'
                     ? 200
-                    : 100; // quality / null → Quality range
+                    : 100; // quality / null -> Quality range
               const stepsStep = turbo ? 1 : qualityPreset === 'max' ? 10 : 5;
               const clamped = Math.min(Math.max(1, inferenceSteps), stepsMax);
               return (
@@ -2725,7 +2725,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                       }
                     }}
                     helpText={t('moreStepsBetterQuality')}
-                    title="More steps usually improves quality but slows generation. Fast≤50 / Quality≤100 / Max≤200 (step 5 or 10)."
+                    title="More steps usually improves quality but slows generation. Fast<=50 / Quality<=100 / Max<=200 (step 5 or 10)."
                   />
                   {turbo ? (
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 -mt-1">
@@ -2733,7 +2733,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                     </p>
                   ) : (
                     <p className="text-[10px] text-zinc-500 -mt-1">
-                      {`Steps capped by preset: Fast≤50 / Quality≤100 / Max≤200 (step ${stepsStep}). Preset+steps persist together on reload.`}
+                      {`Steps capped by preset: Fast<=50 / Quality<=100 / Max<=200 (step ${stepsStep}). Preset+steps persist together on reload.`}
                     </p>
                   )}
                 </>
