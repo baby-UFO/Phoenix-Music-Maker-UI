@@ -597,6 +597,8 @@ interface ActiveJob {
   progress?: number;
   stage?: string;
   cancelled?: boolean;
+  /** Set when Gradio pre-predict is logged — used for stall detection. */
+  prePredictAt?: number;
 }
 
 const activeJobs = new Map<string, ActiveJob>();
@@ -1004,8 +1006,9 @@ async function processGeneration(
     job.error = 'Cancelled';
     return;
   }
-  job.status = 'running';
-  job.stage = 'Starting generation...';
+  // Stay queued until Gradio pre-predict — avoids UI/DB "running/Generating" with no engine progress
+  job.status = 'queued';
+  job.stage = 'Starting…';
 
   // Server-side safety: turbo + steps>8 â†’ force non-turbo DiT (engine still has its own clamp)
   enforceNonTurboForHighSteps(params);
@@ -1101,10 +1104,11 @@ async function processGenerationViaGradio(
     );
   } catch { /* ignore */ }
 
+  job.prePredictAt = Date.now();
   job.stage = 'Generating music via Gradio...';
   job.status = 'running';
 
-  // predict() blocks until generation is complete — MUST timeout + Client.close on stall
+  // predict() blocks until generation is complete — MUST timeout + hardClose on stall
   const predictMs = gradioPredictTimeoutMs(params);
   let result;
   try {
@@ -1115,6 +1119,16 @@ async function processGenerationViaGradio(
       () => {
         console.log(`[Gradio] aborted predict for ${jobId}, force-closing sockets`);
         forceCloseGradioSockets();
+        const j = activeJobs.get(jobId);
+        if (j && (j.status === 'queued' || j.status === 'running')) {
+          j.status = 'failed';
+          j.error = `Gradio predict timed out after ${Math.round(predictMs / 1000)}s`;
+          j.stage = 'Failed';
+        }
+        isProcessingQueue = false;
+        if (jobQueue.length > 0) {
+          void processQueue();
+        }
       },
     );
   } catch (predictErr) {
@@ -1122,6 +1136,16 @@ async function processGenerationViaGradio(
     setInFlightGradioClient(null);
     forceCloseGradioSockets();
     resetGradioClient();
+    const j = activeJobs.get(jobId);
+    if (j && (j.status === 'queued' || j.status === 'running')) {
+      j.status = 'failed';
+      j.error = predictErr instanceof Error ? predictErr.message : 'Gradio predict failed';
+      j.stage = 'Failed';
+    }
+    isProcessingQueue = false;
+    if (jobQueue.length > 0) {
+      void processQueue();
+    }
     throw predictErr;
   }
   setInFlightGradioClient(null);
@@ -1486,6 +1510,26 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
       status: 'failed',
       error: 'Cancelled',
     };
+  }
+
+  // Hung after pre-predict with no completion — fail + hardClose (pillar C stall)
+  const STALL_MS = 180_000;
+  if (
+    (job.status === 'running' || job.status === 'queued') &&
+    job.prePredictAt &&
+    Date.now() - job.prePredictAt > STALL_MS &&
+    !job.result
+  ) {
+    console.warn(`[Gradio] stall detected for ${jobId} after pre-predict`);
+    forceCloseGradioSockets();
+    job.status = 'failed';
+    job.error = 'Gradio predict stalled after pre-predict';
+    job.stage = 'Failed';
+    isProcessingQueue = false;
+    if (jobQueue.length > 0) {
+      void processQueue();
+    }
+    return { status: 'failed', error: job.error };
   }
 
   if (job.status === 'succeeded' && job.result) {

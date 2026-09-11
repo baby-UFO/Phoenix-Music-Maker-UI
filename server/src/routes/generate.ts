@@ -535,7 +535,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
         const aceStatus = await getJobStatus(job.phoenix_task_id);
 
         // Map-miss from getJobStatus is NOT a real engine failure during early life of a job
-        // (in-memory map can lag / restart). Soft-running until ~120s.
+        // (in-memory map can lag / restart). Soft grace <120s — NEVER invent running/Generating.
         if (
           aceStatus.status === 'failed' &&
           aceStatus.error === 'Job not found' &&
@@ -544,11 +544,21 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
           const createdMs = job.created_at ? new Date(job.created_at).getTime() : 0;
           const ageMs = createdMs ? Date.now() - createdMs : 0;
           if (ageMs < 120_000) {
+            // Never persist failed/Job not found inside grace. Demote ghost running → queued.
+            if (job.status === 'running') {
+              try {
+                await pool.query(
+                  `UPDATE generation_jobs SET status = 'queued', updated_at = datetime('now')
+                   WHERE id = ? AND status = 'running'`,
+                  [req.params.jobId],
+                );
+              } catch { /* ignore */ }
+            }
             res.json({
               jobId: req.params.jobId,
-              status: job.status === 'pending' ? 'queued' : job.status,
+              status: 'queued',
               queuePosition: 1,
-              stage: 'Starting...',
+              stage: 'Starting…',
               created_at: job.created_at,
             });
             return;
