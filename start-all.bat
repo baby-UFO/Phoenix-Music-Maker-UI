@@ -46,19 +46,40 @@ if not exist "%ACESTEP_PATH%" (
 REM Prefer non-turbo DiT so inference steps >8 are not clamped to 8 by turbo.
 REM Must set BEFORE the ( ) block ? cmd expands %VAR% at parse time inside blocks.
 REM Prefer Phoenix junction name when present; else legacy acestep-* folder.
+REM Full Monty for babyUFO: prefer XL SFT DiT + LM 4B, NEVER turbo. RTX 4080 16GB needs CPU offload.
 if "%ACESTEP_CONFIG_PATH%"=="" (
-    if exist "%ACESTEP_PATH%\checkpoints\phoenix-v15-base" (
+    if exist "%ACESTEP_PATH%\checkpoints\phoenix-v15-xl-sft\model.safetensors.index.json" (
+        set "ACESTEP_CONFIG_PATH=phoenix-v15-xl-sft"
+    ) else if exist "%ACESTEP_PATH%\checkpoints\acestep-v15-xl-sft\model.safetensors.index.json" (
+        set "ACESTEP_CONFIG_PATH=acestep-v15-xl-sft"
+    ) else if exist "%ACESTEP_PATH%\checkpoints\phoenix-v15-sft" (
+        set "ACESTEP_CONFIG_PATH=phoenix-v15-sft"
+    ) else if exist "%ACESTEP_PATH%\checkpoints\phoenix-v15-base" (
         set "ACESTEP_CONFIG_PATH=phoenix-v15-base"
     ) else (
         set "ACESTEP_CONFIG_PATH=acestep-v15-base"
     )
+)
+if "%ACESTEP_LM_MODEL_PATH%"=="" (
+    if exist "%ACESTEP_PATH%\checkpoints\phoenix-5Hz-lm-4B\model.safetensors.index.json" (
+        set "ACESTEP_LM_MODEL_PATH=phoenix-5Hz-lm-4B"
+    ) else if exist "%ACESTEP_PATH%\checkpoints\acestep-5Hz-lm-4B\model.safetensors.index.json" (
+        set "ACESTEP_LM_MODEL_PATH=acestep-5Hz-lm-4B"
+    ) else if exist "%ACESTEP_PATH%\checkpoints\phoenix-5Hz-lm-1.7B" (
+        set "ACESTEP_LM_MODEL_PATH=phoenix-5Hz-lm-1.7B"
+    ) else (
+        set "ACESTEP_LM_MODEL_PATH=acestep-5Hz-lm-1.7B"
+    )
+)
+if "%ACESTEP_OFFLOAD_TO_CPU%"=="" set "ACESTEP_OFFLOAD_TO_CPU=true"
+if "%ACESTEP_OFFLOAD_DIT_TO_CPU%"=="" set "ACESTEP_OFFLOAD_DIT_TO_CPU=true"
 )
 
 REM Detect Phoenix Engine installation type
 set API_COMMAND=
 if exist "%ACESTEP_PATH%\python_embeded\python.exe" (
     echo [+] Detected Windows Portable Package
-    set API_COMMAND=python_embeded\python acestep\acestep_v15_pipeline.py --port 8001 --server-name 127.0.0.1 --enable-api --backend pt --init_service true --config_path !ACESTEP_CONFIG_PATH!
+    set API_COMMAND=python_embeded\python acestep\acestep_v15_pipeline.py --port 8001 --server-name 127.0.0.1 --enable-api --backend pt --init_service true --config_path !ACESTEP_CONFIG_PATH! --lm_model_path !ACESTEP_LM_MODEL_PATH! --offload_to_cpu !ACESTEP_OFFLOAD_TO_CPU! --offload_dit_to_cpu !ACESTEP_OFFLOAD_DIT_TO_CPU!
 ) else (
     echo [+] Detected Standard Installation
     set API_COMMAND=uv run acestep-api --port 8001

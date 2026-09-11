@@ -11,6 +11,8 @@ export const PHOENIX_DIT_MODELS = [
   'phoenix-v15-turbo-shift1',
   'phoenix-v15-turbo-shift3',
   'phoenix-v15-turbo-continuous',
+  'phoenix-v15-xl-base',
+  'phoenix-v15-xl-sft',
 ] as const;
 
 export const PHOENIX_LM_MODELS = [
@@ -32,6 +34,8 @@ const PHOENIX_TO_ENGINE: Record<string, string> = {
   'phoenix-5Hz-lm-0.6B': 'acestep-5Hz-lm-0.6B',
   'phoenix-5Hz-lm-1.7B': 'acestep-5Hz-lm-1.7B',
   'phoenix-5Hz-lm-4B': 'acestep-5Hz-lm-4B',
+  'phoenix-v15-xl-base': 'acestep-v15-xl-base',
+  'phoenix-v15-xl-sft': 'acestep-v15-xl-sft',
 };
 
 const ENGINE_TO_PHOENIX: Record<string, string> = Object.fromEntries(
@@ -48,6 +52,8 @@ const PHOENIX_LABELS: Record<string, string> = {
   'phoenix-5Hz-lm-0.6B': 'Phoenix 5Hz LM 0.6B',
   'phoenix-5Hz-lm-1.7B': 'Phoenix 5Hz LM 1.7B',
   'phoenix-5Hz-lm-4B': 'Phoenix 5Hz LM 4B',
+  'phoenix-v15-xl-base': 'Phoenix V15 XL Base',
+  'phoenix-v15-xl-sft': 'Phoenix V15 XL SFT',
 };
 
 /** Strip path / whitespace; return basename-ish id. */
@@ -127,4 +133,29 @@ export function isPhoenixDitId(id: string | null | undefined): boolean {
 export function isPhoenixLmId(id: string | null | undefined): boolean {
   const p = toPhoenixModelId(id);
   return (PHOENIX_LM_MODELS as readonly string[]).includes(p) || p.startsWith('phoenix-5Hz-lm-');
+}
+/** Preferred default LM when available on disk. */
+export const DEFAULT_PHOENIX_LM_MODEL = 'phoenix-5Hz-lm-4B' as const;
+
+/** Preferred max-quality DiT when available on disk (never turbo). */
+export const DEFAULT_PHOENIX_DIT_MODEL = 'phoenix-v15-xl-sft' as const;
+
+/** Prefer XL SFT, then SFT, then base — never turbo. */
+export function pickBestPreloadedDit(preloadedNames: string[], fallback: string = DEFAULT_PHOENIX_DIT_MODEL): string {
+  const set = new Set(preloadedNames.map((n) => toPhoenixModelId(n)).filter((id) => !id.toLowerCase().includes('turbo')));
+  for (const id of ['phoenix-v15-xl-sft', 'phoenix-v15-xl-base', 'phoenix-v15-sft', 'phoenix-v15-base'] as const) {
+    if (set.has(id)) return id;
+  }
+  const first = [...set][0];
+  return first || fallback;
+}
+
+/** Prefer 4B, then 1.7B, then 0.6B, else first preloaded id. */
+export function pickBestPreloadedLm(preloadedNames: string[], fallback: string = DEFAULT_PHOENIX_LM_MODEL): string {
+  const set = new Set(preloadedNames.map((n) => toPhoenixModelId(n)));
+  for (const id of ['phoenix-5Hz-lm-4B', 'phoenix-5Hz-lm-1.7B', 'phoenix-5Hz-lm-0.6B'] as const) {
+    if (set.has(id)) return id;
+  }
+  const first = preloadedNames[0];
+  return first ? toPhoenixModelId(first) : fallback;
 }

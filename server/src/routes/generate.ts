@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
+import { existsSync, statSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from '../db/pool.js';
@@ -19,9 +20,54 @@ import {
   resolvePythonPath,
 } from '../services/phoenixEngine.js';
 import { getStorageProvider } from '../services/storage/factory.js';
-import { toEngineModelId, toPhoenixModelId, getPhoenixModelLabel, PHOENIX_DIT_MODELS } from '../utils/phoenixModels.js';
+import { toEngineModelId, toPhoenixModelId, getPhoenixModelLabel, PHOENIX_DIT_MODELS, PHOENIX_LM_MODELS } from '../utils/phoenixModels.js';
 
 const router = Router();
+
+/** True if a checkpoint dir has usable weights (single safetensors or complete shard set). */
+function checkpointHasWeights(modelPath: string, existsSync: typeof import('fs').existsSync, statSync: typeof import('fs').statSync, readFileSync: typeof import('fs').readFileSync): boolean {
+  try {
+    if (!existsSync(modelPath) || !statSync(modelPath).isDirectory()) return false;
+    const single = path.join(modelPath, 'model.safetensors');
+    if (existsSync(single) && statSync(single).isFile() && statSync(single).size > 1_000_000) return true;
+    const indexPath = path.join(modelPath, 'model.safetensors.index.json');
+    if (!existsSync(indexPath)) return false;
+    const index = JSON.parse(readFileSync(indexPath, 'utf8')) as { weight_map?: Record<string, string> };
+    const shards = [...new Set(Object.values(index.weight_map || {}))];
+    if (shards.length === 0) return false;
+    for (const shard of shards) {
+      const sp = path.join(modelPath, shard);
+      if (!existsSync(sp) || !statSync(sp).isFile() || statSync(sp).size <= 1_000_000) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function listLmModelsFromDisk(checkpointsDir: string) {
+  return (PHOENIX_LM_MODELS as readonly string[]).map((name) => {
+    const engineName = toEngineModelId(name);
+    const candidates = [path.join(checkpointsDir, name), path.join(checkpointsDir, engineName)];
+    let is_preloaded = false;
+    for (const modelPath of candidates) {
+      if (checkpointHasWeights(modelPath, existsSync, statSync, readFileSync)) {
+        is_preloaded = true;
+        break;
+      }
+    }
+    return {
+      name,
+      engineName,
+      label: getPhoenixModelLabel(name),
+      is_preloaded,
+    };
+  }).sort((a, b) => {
+    if (a.is_preloaded !== b.is_preloaded) return a.is_preloaded ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 
 // Auto-generate a song title from lyrics or style when none is provided
 function stamp(): string {
@@ -659,9 +705,11 @@ router.get('/models', async (_req, res: Response) => {
     // - MAIN_MODEL_COMPONENTS includes "acestep-v15-turbo" (bundled with main download)
     // - SUBMODEL_REGISTRY includes the rest (separate HuggingFace repos, auto-downloaded on init)
     const ALL_DIT_MODELS = [
-      'phoenix-v15-turbo',
+      'phoenix-v15-xl-sft',
+      'phoenix-v15-xl-base',
       'phoenix-v15-base',
       'phoenix-v15-sft',
+      'phoenix-v15-turbo',
       'phoenix-v15-turbo-shift1',
       'phoenix-v15-turbo-shift3',
       'phoenix-v15-turbo-continuous',
@@ -685,20 +733,16 @@ router.get('/models', async (_req, res: Response) => {
 
     // Check which models are downloaded (exist on disk)
     // Matches Gradio's handler.py check_model_exists() and get_available_acestep_v15_models()
-    const { existsSync, statSync } = await import('fs');
+    const { existsSync, statSync, readFileSync } = await import('fs');
     const downloaded = new Set<string>();
     for (const phoenixName of ALL_DIT_MODELS) {
       const engineName = toEngineModelId(phoenixName);
-      // Resolve via phoenix junction OR acestep-* folder
       const candidates = [path.join(checkpointsDir, phoenixName), path.join(checkpointsDir, engineName)];
       try {
         for (const modelPath of candidates) {
-          if (existsSync(modelPath) && statSync(modelPath).isDirectory()) {
-            const weights = path.join(modelPath, 'model.safetensors');
-            if (existsSync(weights) && statSync(weights).isFile() && statSync(weights).size > 1_000_000) {
-              downloaded.add(phoenixName);
-              break;
-            }
+          if (checkpointHasWeights(modelPath, existsSync, statSync, readFileSync)) {
+            downloaded.add(phoenixName);
+            break;
           }
         }
       } catch { /* skip */ }
@@ -713,6 +757,7 @@ router.get('/models', async (_req, res: Response) => {
         if (!statSync(full).isDirectory()) continue;
         if (entry.startsWith('acestep-v15-') || entry.startsWith('phoenix-v15-')) {
           const phoenixName = toPhoenixModelId(entry);
+          if (!checkpointHasWeights(full, existsSync, statSync, readFileSync)) continue;
           downloaded.add(phoenixName);
           if (!ALL_DIT_MODELS.includes(phoenixName)) {
             ALL_DIT_MODELS.push(phoenixName);
@@ -778,6 +823,29 @@ router.get('/models', async (_req, res: Response) => {
     });
   } catch (error) {
     console.error('Models error:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+
+// GET /api/generate/lm-models — 5Hz LM checkpoints with disk preload truth
+router.get('/lm-models', async (_req, res: Response) => {
+  try {
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const checkpointsDir = path.join(PHOENIX_ENGINE_DIR, 'checkpoints');
+    const lmModels = listLmModelsFromDisk(checkpointsDir);
+    const preferred = ['phoenix-5Hz-lm-4B', 'phoenix-5Hz-lm-1.7B', 'phoenix-5Hz-lm-0.6B'];
+    const best = preferred.find((id) => lmModels.some((m) => m.name === id && m.is_preloaded))
+      || lmModels.find((m) => m.is_preloaded)?.name
+      || 'phoenix-5Hz-lm-4B';
+    res.json({
+      lmModels,
+      models: lmModels,
+      recommended: best,
+      note: 'LM ids are phoenix-*; engine folders remain acestep-*. is_preloaded requires model.safetensors or a complete sharded safetensors set.',
+    });
+  } catch (error) {
+    console.error('LM models error:', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });

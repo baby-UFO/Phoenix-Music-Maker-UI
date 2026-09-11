@@ -441,7 +441,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(cs('inferMethod', 'sde'));
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>(cs('lmBackend', 'vllm'));
   const [lmModel, setLmModel] = useState(() => {
-    return migrateToPhoenixModelId(lsGet(storageKeys.lmModel.primary, storageKeys.lmModel.legacy) || 'phoenix-5Hz-lm-4B');
+    return migrateToPhoenixModelId(lsGet(storageKeys.lmModel.primary, storageKeys.lmModel.legacy) || DEFAULT_PHOENIX_LM_MODEL);
   });
   const [shift, setShift] = useState(cs('shift', 1.0));
 
@@ -529,7 +529,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return migrateToPhoenixModelId(lsGet(storageKeys.model.primary, storageKeys.model.legacy) || 'phoenix-v15-base');
+    return migrateToPhoenixModelId(lsGet(storageKeys.model.primary, storageKeys.model.legacy) || DEFAULT_PHOENIX_DIT_MODEL);
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -547,35 +547,44 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   const applyQualityPreset = useCallback((preset: 'fast' | 'quality' | 'max') => {
     setQualityPreset(preset);
-    // Persist via create-settings effect (qualityPreset in payload) + direct key
     try { localStorage.setItem('ace-create-qualityPreset', preset); } catch { /* ignore */ }
 
-    const hasSft = fetchedModels.some((m) => (m.name === 'phoenix-v15-sft' || m.name === 'acestep-v15-sft') && m.is_preloaded);
-    const turboId =
-      fetchedModels.find((m) => (m.name === 'phoenix-v15-turbo' || m.name === 'acestep-v15-turbo') && m.is_preloaded)?.name
-      || fetchedModels.find((m) => /turbo/i.test(m.name) && m.is_preloaded)?.name
-      || 'phoenix-v15-turbo';
+    const preloadedDit = fetchedModels.filter((m) => m.is_preloaded).map((m) => toPhoenixModelId(m.name));
+    const bestMax = pickBestPreloadedDit(preloadedDit, DEFAULT_PHOENIX_DIT_MODEL);
+    const bestQuality =
+      preloadedDit.includes('phoenix-v15-xl-sft') ? 'phoenix-v15-xl-sft'
+      : preloadedDit.includes('phoenix-v15-sft') ? 'phoenix-v15-sft'
+      : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-base');
+    const bestFast =
+      preloadedDit.includes('phoenix-v15-base') ? 'phoenix-v15-base'
+      : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-base');
 
+    const preloadedLm = fetchedLmModels.filter((m) => m.is_preloaded).map((m) => toPhoenixModelId(m.name));
+    const bestLm = pickBestPreloadedLm(preloadedLm, DEFAULT_PHOENIX_LM_MODEL);
+
+    // NEVER turbo for babyUFO — full quality stack only
     if (preset === 'fast') {
-      persistModel(toPhoenixModelId(turboId));
-      setInferenceSteps(8);
-      setInferMethod('ode');
-      setShift(3.0);
-      setUseAdg(false);
+      persistModel(bestFast);
+      setInferenceSteps(50);
+      setInferMethod('sde');
+      setShift(1.0);
+      setUseAdg(true);
     } else if (preset === 'quality') {
-      persistModel('phoenix-v15-base');
+      persistModel(bestQuality);
       setInferenceSteps(100);
       setInferMethod('sde');
       setShift(1.0);
       setUseAdg(true);
     } else {
-      persistModel(hasSft ? 'phoenix-v15-sft' : 'phoenix-v15-base');
+      persistModel(bestMax);
       setInferenceSteps(200);
       setInferMethod('sde');
       setShift(1.0);
       setUseAdg(true);
     }
-  }, [fetchedModels, persistModel]);
+    setLmModel(bestLm);
+    lsSet(storageKeys.lmModel.primary, bestLm, storageKeys.lmModel.legacy);
+  }, [fetchedModels, fetchedLmModels, persistModel]);
 
 
   // Fallback model list when backend is unavailable
@@ -991,29 +1000,47 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           setFetchedModels(models);
           if (data.bootModel || data.boot_model) {
             setEngineBootModel(toPhoenixModelId(data.bootModel || data.boot_model));
-          } else {
-            const active = models.find((m: any) => m.is_active)?.name || models.find((m: any) => m.is_preloaded && !/turbo/i.test(m.name))?.name || null;
-            // Prefer server-reported boot; fallback stays null until API adds bootModel
-            if (data.engineConfigPath) setEngineBootModel(toPhoenixModelId(data.engineConfigPath));
+          } else if (data.engineConfigPath) {
+            setEngineBootModel(toPhoenixModelId(data.engineConfigPath));
           }
-          // Prefer non-turbo when high steps requested. Don't blindly force engine "active" turbo.
+          const preloaded = models.filter((m: any) => m.is_preloaded).map((m: any) => toPhoenixModelId(m.name));
           const savedRaw = lsGet(storageKeys.model.primary, storageKeys.model.legacy);
           const saved = savedRaw ? migrateToPhoenixModelId(savedRaw) : '';
-          const preferBase = models.find((m: any) => toPhoenixModelId(m.name) === 'phoenix-v15-base')
-            || models.find((m: any) => toPhoenixModelId(m.name) === 'phoenix-v15-sft')
-            || models.find((m: any) => !String(m.name).includes('turbo'));
-          const active = models.find((m: any) => m.is_active);
-          let next = saved || (preferBase ? toPhoenixModelId(preferBase.name) : undefined) || (active ? toPhoenixModelId(active.name) : undefined) || 'phoenix-v15-base';
-          next = toPhoenixModelId(next);
-          if ((typeof inferenceSteps === 'number' ? inferenceSteps : 200) > 8 && String(next).includes('turbo') && preferBase) {
-            next = toPhoenixModelId(preferBase.name);
-          }
+          // NEVER keep turbo selected for babyUFO max-quality workflow
+          let next = saved && preloaded.includes(saved) && !saved.includes('turbo')
+            ? saved
+            : pickBestPreloadedDit(preloaded, DEFAULT_PHOENIX_DIT_MODEL);
+          if (next.includes('turbo')) next = pickBestPreloadedDit(preloaded, DEFAULT_PHOENIX_DIT_MODEL);
           setSelectedModel(next);
           lsSet(storageKeys.model.primary, next, storageKeys.model.legacy);
+        }
+        if (Array.isArray(data.lmModels) && data.lmModels.length > 0) {
+          setFetchedLmModels(data.lmModels);
         }
       }
     } catch {
       // ignore - will use fallback model list
+    }
+
+    try {
+      const lmRes = await fetch('/api/generate/lm-models');
+      if (lmRes.ok) {
+        const lmData = await lmRes.json();
+        const lmModels = lmData.lmModels || lmData.models || [];
+        if (lmModels.length > 0) {
+          setFetchedLmModels(lmModels);
+          const preloadedLm = lmModels.filter((m: any) => m.is_preloaded).map((m: any) => toPhoenixModelId(m.name));
+          const savedLmRaw = lsGet(storageKeys.lmModel.primary, storageKeys.lmModel.legacy);
+          const savedLm = savedLmRaw ? migrateToPhoenixModelId(savedLmRaw) : DEFAULT_PHOENIX_LM_MODEL;
+          const nextLm = preloadedLm.includes(savedLm)
+            ? savedLm
+            : pickBestPreloadedLm(preloadedLm, DEFAULT_PHOENIX_LM_MODEL);
+          setLmModel(nextLm);
+          lsSet(storageKeys.lmModel.primary, nextLm, storageKeys.lmModel.legacy);
+        }
+      }
+    } catch {
+      // ignore LM list fetch failures
     }
   }, []);
 
@@ -1185,7 +1212,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         temperature: lmTemperature,
         topK: lmTopK > 0 ? lmTopK : undefined,
         topP: lmTopP,
-        lmModel: lmModel || 'phoenix-5Hz-lm-0.6B',
+        lmModel: (fetchedLmModels.some((m) => m.is_preloaded && toPhoenixModelId(m.name) === lmModel) ? lmModel : pickBestPreloadedLm(fetchedLmModels.filter((m) => m.is_preloaded).map((m) => m.name), DEFAULT_PHOENIX_LM_MODEL)),
         lmBackend: lmBackend || 'pt',
       }, token);
 
@@ -1609,7 +1636,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         audioFormat,
         inferMethod,
         lmBackend,
-        lmModel,
+        lmModel: (fetchedLmModels.some((m) => m.is_preloaded && toPhoenixModelId(m.name) === toPhoenixModelId(lmModel))
+          ? toPhoenixModelId(lmModel)
+          : pickBestPreloadedLm(fetchedLmModels.filter((m) => m.is_preloaded).map((m) => m.name), DEFAULT_PHOENIX_LM_MODEL)),
         shift,
         lmTemperature,
         lmCfgScale,
@@ -2720,9 +2749,14 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 onChange={(e) => { const v = e.target.value; setLmModel(v); lsSet(storageKeys.lmModel.primary, v, storageKeys.lmModel.legacy); }}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
               >
-                <option value="phoenix-5Hz-lm-0.6B">{t('lmModel06B')}</option>
-                <option value="phoenix-5Hz-lm-1.7B">{t('lmModel17B')}</option>
-                <option value="phoenix-5Hz-lm-4B">{t('lmModel4B')}</option>
+                {(fetchedLmModels.filter((m) => m.is_preloaded).length > 0
+                  ? fetchedLmModels.filter((m) => m.is_preloaded)
+                  : PHOENIX_LM_MODELS.map((name) => ({ name, is_preloaded: true, label: getPhoenixModelLabel(name) }))
+                ).map((m) => (
+                  <option key={m.name} value={toPhoenixModelId(m.name)}>
+                    {m.label || getPhoenixModelLabel(m.name)}
+                  </option>
+                ))}
               </select>
               <p className="text-[10px] text-zinc-500">{t('lmModelHint')}</p>
             </div>
