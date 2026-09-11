@@ -189,7 +189,7 @@ export const SongList: React.FC<SongListProps> = ({
     }, [filteredSongs, filteredUploads]);
 
     const selectableSongs = useMemo(
-        () => filteredSongs.filter(song => !song.isGenerating),
+        () => filteredSongs,
         [filteredSongs]
     );
 
@@ -351,7 +351,6 @@ export const SongList: React.FC<SongListProps> = ({
                                     onPlay={() => onPlay(item.song)}
                                     onSelect={() => onSelect(item.song)}
                                     onToggleSelect={() => {
-                                        if (item.song.isGenerating) return;
                                         setSelectedIds(prev => {
                                             const next = new Set(prev);
                                             if (next.has(item.song.id)) next.delete(item.song.id);
@@ -531,8 +530,7 @@ const SongItem: React.FC<SongItemProps> = ({
                     className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isChecked
                             ? 'bg-emerald-700 border-emerald-700 text-white'
                             : 'border-zinc-300 dark:border-zinc-600 text-transparent hover:border-zinc-400 dark:hover:border-zinc-500'
-                        } ${song.isGenerating ? 'opacity-40 cursor-not-allowed' : ''}`}
-                    disabled={song.isGenerating}
+                        }`}
                     aria-pressed={isChecked}
                 >
                     <Check size={12} strokeWidth={3} className={isChecked ? 'text-white' : 'text-transparent'} />
