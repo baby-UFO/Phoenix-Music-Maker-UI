@@ -556,11 +556,11 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     try { localStorage.setItem('ace-create-qualityPreset', preset); } catch { /* ignore */ }
 
     const preloadedDit = fetchedModels.filter((m) => m.is_preloaded).map((m) => toPhoenixModelId(m.name));
-    const bestMax = pickBestPreloadedDit(preloadedDit, DEFAULT_PHOENIX_DIT_MODEL);
-    const bestQuality =
-      preloadedDit.includes('phoenix-v15-xl-sft') ? 'phoenix-v15-xl-sft'
-      : preloadedDit.includes('phoenix-v15-sft') ? 'phoenix-v15-sft'
-      : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-base');
+    // Full Monty: Quality + Max use Phoenix XL SFT when on disk; Fast uses Phoenix V15 Base (never turbo).
+    const bestMax = preloadedDit.includes('phoenix-v15-xl-sft')
+      ? 'phoenix-v15-xl-sft'
+      : pickBestPreloadedDit(preloadedDit, DEFAULT_PHOENIX_DIT_MODEL);
+    const bestQuality = bestMax; // same DiT family — steps differ
     const bestFast =
       preloadedDit.includes('phoenix-v15-base') ? 'phoenix-v15-base'
       : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-base');
