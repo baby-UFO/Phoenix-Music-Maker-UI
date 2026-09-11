@@ -97,7 +97,7 @@ echo.
 
 REM Start Phoenix Engine API in new window
 echo [1/3] Starting Phoenix Engine API server...
-start "Phoenix Engine" cmd /k "cd /d !ACESTEP_PATH! && set ACESTEP_CONFIG_PATH=!ACESTEP_CONFIG_PATH! && set ACESTEP_FORCE_LM_4B=!ACESTEP_FORCE_LM_4B! && set ACESTEP_LM_MODEL_PATH=!ACESTEP_LM_MODEL_PATH! && !API_COMMAND!"
+start "Phoenix Engine" cmd /k "cd /d !ACESTEP_PATH! && title Phoenix Engine && set ACESTEP_CONFIG_PATH=!ACESTEP_CONFIG_PATH! && set ACESTEP_FORCE_LM_4B=!ACESTEP_FORCE_LM_4B! && set ACESTEP_LM_MODEL_PATH=!ACESTEP_LM_MODEL_PATH! && !API_COMMAND!"
 
 REM Wait for API to start
 echo Waiting for API to initialize...
@@ -105,7 +105,7 @@ timeout /t 5 /nobreak >nul
 
 REM Start backend in new window
 echo [2/3] Starting backend server...
-start "Phoenix Music Maker UI Backend" cmd /k "cd /d %~dp0server && npm run dev"
+start "Phoenix Music Maker UI Backend" cmd /k "cd /d %~dp0server && title Phoenix Music Maker UI Backend && npm run dev"
 
 REM Wait for backend to start
 echo Waiting for backend to start...
@@ -113,7 +113,7 @@ timeout /t 3 /nobreak >nul
 
 REM Start frontend in new window
 echo [3/3] Starting frontend...
-start "Phoenix Music Maker UI" cmd /k "cd /d %~dp0 && npm run dev"
+start "Phoenix Music Maker UI" cmd /k "cd /d %~dp0 && title Phoenix Music Maker UI && npm run dev"
 
 REM Wait a moment
 timeout /t 2 /nobreak >nul
