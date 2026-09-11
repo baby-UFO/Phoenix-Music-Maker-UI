@@ -238,9 +238,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     lmBatchChunkSize: 8,
     isFormatCaption: false,
     showLoraPanel: true,
-    loraPath: 'E:\\Phoenix-Engine\\lora_output_v4\\final\\adapter',
+    loraPath: 'E:\\Phoenix-Engine\\lora_output_v5\\final\\adapter',
     loraEnabled: true,
-    loraScale: 1.0,
+    loraScale: 0.95,
   };
 
   const loadCreateSettings = (): CreateSettings => {
@@ -265,7 +265,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           preset = 'quality';
           parsed.qualityPreset = 'quality';
         }
-        const stepsFor = (p: 'fast' | 'quality' | 'max') => (p === 'fast' ? 50 : p === 'quality' ? 100 : 200);
+        const stepsFor = (p: 'fast' | 'quality' | 'max') => (p === 'fast' ? 8 : p === 'quality' ? 100 : 200);
         const expected = stepsFor(preset);
         const steps = typeof parsed.inferenceSteps === 'number' ? parsed.inferenceSteps : expected;
         // First run: sync steps to preset; orphaned 200 with quality/null/fast -> Quality->100
@@ -286,9 +286,17 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           parsed.inferenceSteps = expected;
         }
       } catch { /* ignore */ }
-      // Prefer v4 adapter; rewrite missing, non-v4 lora_output/.../final, or stale ACE-Step paths to Phoenix-Engine.
-      const bad = !parsed.loraPath || /ACE-Step/i.test(parsed.loraPath) || /ace-step/i.test(parsed.loraPath) || (/lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v4/.test(parsed.loraPath));
-      if (bad) parsed.loraPath = 'E:\\Phoenix-Engine\\lora_output_v4\\final\\adapter';
+      // Prefer v5 adapter; rewrite missing, v4, non-v5 lora_output/.../final, or stale ACE-Step paths to Phoenix-Engine.
+      const bad = !parsed.loraPath || /ACE-Step/i.test(parsed.loraPath) || /ace-step/i.test(parsed.loraPath) || /lora_output_v4/i.test(parsed.loraPath) || (/lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v5/.test(parsed.loraPath));
+      if (bad) parsed.loraPath = 'E:\\Phoenix-Engine\\lora_output_v5\\final\\adapter';
+      // One-shot: bump default scale to 0.95 when migrating from v4/1.0 defaults
+      try {
+        const migLora = 'phoenix-lora-v5-scale-0.95-v1';
+        if (!localStorage.getItem(migLora)) {
+          if (typeof parsed.loraScale !== 'number' || parsed.loraScale === 1.0) parsed.loraScale = 0.95;
+          localStorage.setItem(migLora, '1');
+        }
+      } catch { /* ignore */ }
       return parsed;
     } catch {
       return { ...BUILTIN_CREATE_DEFAULTS };
@@ -521,10 +529,10 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   // LoRA Parameters
   const [showLoraPanel, setShowLoraPanel] = useState(cs('showLoraPanel', true));
-  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\\Phoenix-Engine\\lora_output_v4\\final\\adapter'));
+  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\\Phoenix-Engine\\lora_output_v5\\final\\adapter'));
   const [loraLoaded, setLoraLoaded] = useState(false);
   const [loraEnabled, setLoraEnabled] = useState(cs('loraEnabled', true));
-  const [loraScale, setLoraScale] = useState(cs('loraScale', 1.0));
+  const [loraScale, setLoraScale] = useState(cs('loraScale', 0.95));
   const [loraError, setLoraError] = useState<string | null>(null);
   const [isLoraLoading, setIsLoraLoading] = useState(false);
 
@@ -585,33 +593,37 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     try { localStorage.setItem('ace-create-qualityPreset', preset); } catch { /* ignore */ }
 
     const preloadedDit = fetchedModels.filter((m) => m.is_preloaded).map((m) => toPhoenixModelId(m.name));
-    // Quality + Max prefer Phoenix V15 SFT (LoRA v5 is SFT 2048); Fast uses Base (never turbo/XL).
-    const bestMax = preloadedDit.includes('phoenix-v15-sft')
+    // Ladder: Turbo → turbo DiT | Standard → Base | Premium → SFT (LoRA v5 is SFT 2048)
+    const bestPremium = preloadedDit.includes('phoenix-v15-sft')
       ? 'phoenix-v15-sft'
       : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-sft');
-    const bestQuality = bestMax; // same DiT family - steps differ
-    const bestFast =
-      preloadedDit.includes('phoenix-v15-base') ? 'phoenix-v15-base'
+    const bestStandard = preloadedDit.includes('phoenix-v15-base')
+      ? 'phoenix-v15-base'
       : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-base');
+    const bestTurbo = preloadedDit.includes('phoenix-v15-turbo')
+      ? 'phoenix-v15-turbo'
+      : (preloadedDit.find((id) => id.includes('turbo')) || 'phoenix-v15-turbo');
 
     const preloadedLm = fetchedLmModels.filter((m) => m.is_preloaded).map((m) => toPhoenixModelId(m.name));
     const bestLm = pickBestPreloadedLm(preloadedLm, DEFAULT_PHOENIX_LM_MODEL);
 
-    // NEVER turbo for babyUFO â€” full quality stack only
     if (preset === 'fast') {
-      persistModel(bestFast);
-      setInferenceSteps(50);
-      setInferMethod('sde');
+      // Turbo chip
+      persistModel(bestTurbo);
+      setInferenceSteps(8);
+      setInferMethod('ode');
       setShift(1.0);
       setUseAdg(false);
     } else if (preset === 'quality') {
-      persistModel(bestQuality);
+      // Standard chip (middle: Base)
+      persistModel(bestStandard);
       setInferenceSteps(100);
       setInferMethod('sde');
       setShift(1.0);
       setUseAdg(false);
     } else {
-      persistModel(bestMax);
+      // Premium chip (SFT)
+      persistModel(bestPremium);
       setInferenceSteps(200);
       setInferMethod('sde');
       setShift(1.0);
@@ -794,8 +806,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   // Prefer real multi-step diffusion: turbo + steps>8 -> auto-switch to base/sft
   useEffect(() => {
+    if (qualityPreset === 'fast') return; // Turbo chip keeps turbo DiT
     switchToNonTurboForHighSteps(inferenceSteps, selectedModel);
-  }, [inferenceSteps, selectedModel, switchToNonTurboForHighSteps]);
+  }, [inferenceSteps, selectedModel, qualityPreset, switchToNonTurboForHighSteps]);
 
   // Auto-disable thinking and ADG when LoRA is loaded
   useEffect(() => {
@@ -1039,11 +1052,15 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           const preloaded = models.filter((m: any) => m.is_preloaded).map((m: any) => toPhoenixModelId(m.name));
           const savedRaw = lsGet(storageKeys.model.primary, storageKeys.model.legacy);
           const saved = savedRaw ? migrateToPhoenixModelId(savedRaw) : '';
-          // NEVER keep turbo selected for babyUFO max-quality workflow
-          let next = saved && preloaded.includes(saved) && !saved.includes('turbo')
+          // Allow turbo only when Turbo chip (fast) is the saved quality preset
+          const savedPreset = (() => {
+            try { return localStorage.getItem('ace-create-qualityPreset'); } catch { return null; }
+          })();
+          const allowTurbo = savedPreset === 'fast';
+          let next = saved && preloaded.includes(saved) && (allowTurbo || !saved.includes('turbo'))
             ? saved
             : pickBestPreloadedDit(preloaded, DEFAULT_PHOENIX_DIT_MODEL);
-          if (next.includes('turbo')) next = pickBestPreloadedDit(preloaded, DEFAULT_PHOENIX_DIT_MODEL);
+          if (next.includes('turbo') && !allowTurbo) next = pickBestPreloadedDit(preloaded, DEFAULT_PHOENIX_DIT_MODEL);
           setSelectedModel(next);
           lsSet(storageKeys.model.primary, next, storageKeys.model.legacy);
         }
@@ -2387,9 +2404,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Quality</span>
             {(
               [
-                { id: 'fast' as const, label: 'Fast', hint: 'Phoenix V15 Base | 50 | sde' },
-                { id: 'quality' as const, label: 'Quality', hint: 'Phoenix V15 SFT | 100 | sde' },
-                { id: 'max' as const, label: 'Max', hint: 'Phoenix V15 SFT | 200 | sde' },
+                { id: 'fast' as const, label: 'Turbo', hint: 'Phoenix V15 Turbo | 8 | ode' },
+                { id: 'quality' as const, label: 'Standard', hint: 'Phoenix V15 Base | 100 | sde' },
+                { id: 'max' as const, label: 'Premium', hint: 'Phoenix V15 SFT | 200 | sde' },
               ]
             ).map((preset) => (
               <button
