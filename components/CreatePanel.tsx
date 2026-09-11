@@ -615,18 +615,18 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       setShift(1.0);
       setUseAdg(false);
     } else if (preset === 'quality') {
-      // Standard chip (middle: Base)
+      // Standard chip (middle: Base) — donor: ode + shift 3.0, 100 steps
       persistModel(bestStandard);
       setInferenceSteps(100);
-      setInferMethod('sde');
-      setShift(1.0);
+      setInferMethod('ode');
+      setShift(3.0);
       setUseAdg(false);
     } else {
-      // Premium chip (SFT)
+      // Premium chip (SFT) — donor: ode + shift 3.0, 200 steps
       persistModel(bestPremium);
       setInferenceSteps(200);
-      setInferMethod('sde');
-      setShift(1.0);
+      setInferMethod('ode');
+      setShift(3.0);
       setUseAdg(false);
     }
     setLmModel(bestLm);
@@ -2404,9 +2404,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Quality</span>
             {(
               [
-                { id: 'fast' as const, label: 'Turbo', hint: 'Phoenix V15 Turbo | 8 | ode' },
-                { id: 'quality' as const, label: 'Standard', hint: 'Phoenix V15 Base | 100 | sde' },
-                { id: 'max' as const, label: 'Premium', hint: 'Phoenix V15 SFT | 200 | sde' },
+                { id: 'fast' as const, label: 'Turbo', hint: 'Turbo | 8 | ode' },
+                { id: 'quality' as const, label: 'Standard', hint: 'Base | 100 | ode | shift3' },
+                { id: 'max' as const, label: 'Premium', hint: 'SFT | 200 | ode | shift3' },
               ]
             ).map((preset) => (
               <button
