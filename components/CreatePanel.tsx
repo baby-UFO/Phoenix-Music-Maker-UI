@@ -542,6 +542,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   
   // Available models fetched from backend
   const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
+  const [fetchedLmModels, setFetchedLmModels] = useState<{ name: string; is_preloaded: boolean; label?: string }[]>([]);
   const [engineBootModel, setEngineBootModel] = useState<string | null>(null);
 
   const persistModel = useCallback((modelId: string) => {
