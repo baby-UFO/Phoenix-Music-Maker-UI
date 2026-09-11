@@ -1,6 +1,6 @@
 /**
- * Phoenix Music Maker — Master Track (FFmpeg LGPL filter chain)
- * Chain: EQ → acompressor → stereotools → alimiter → 2-pass loudnorm
+ * Phoenix Music Maker â€” Master Track (FFmpeg LGPL filter chain)
+ * Chain: EQ â†’ acompressor â†’ stereotools â†’ alimiter â†’ 2-pass loudnorm
  * Output: *_master.<ext> next to source when local; never overwrites source.
  * Branding: Phoenix Music Maker / PMM / Phoenix Engine only.
  */
@@ -35,7 +35,7 @@ export const MASTER_PRESETS: Record<MasterPresetId, MasterPreset> = {
     I: -14,
     TP: -1.0,
     LRA: 11,
-    description: '−14 LUFS / −1 dBTP — Spotify, YouTube, Apple Music',
+    description: 'âˆ’14 LUFS / âˆ’1 dBTP â€” Spotify, YouTube, Apple Music',
   },
   club: {
     id: 'club',
@@ -43,7 +43,7 @@ export const MASTER_PRESETS: Record<MasterPresetId, MasterPreset> = {
     I: -9.5,
     TP: -1.0,
     LRA: 9,
-    description: '−9.5 LUFS / −1 dBTP — louder club / DJ systems',
+    description: 'âˆ’9.5 LUFS / âˆ’1 dBTP â€” louder club / DJ systems',
   },
   soft: {
     id: 'soft',
@@ -51,18 +51,18 @@ export const MASTER_PRESETS: Record<MasterPresetId, MasterPreset> = {
     I: -16,
     TP: -1.5,
     LRA: 11,
-    description: '−16 LUFS / −1.5 dBTP — gentle / podcast-friendly',
+    description: 'âˆ’16 LUFS / âˆ’1.5 dBTP â€” gentle / podcast-friendly',
   },
 };
 
 export interface MasterKnobParams {
-  /** Low shelf gain dB (−12..12), default 0.5 */
+  /** Low shelf gain dB (âˆ’12..12), default 0.5 */
   bassDb?: number;
-  /** Peaking mid gain dB (−12..12), default 0 */
+  /** Peaking mid gain dB (âˆ’12..12), default 0 */
   midDb?: number;
-  /** High shelf gain dB (−12..12), default 1.0 */
+  /** High shelf gain dB (âˆ’12..12), default 1.0 */
   trebleDb?: number;
-  /** Compressor threshold dB, default −18 */
+  /** Compressor threshold dB, default âˆ’18 */
   compThreshold?: number;
   /** Compressor ratio, default 2.5 */
   compRatio?: number;
@@ -118,7 +118,7 @@ function buildProcessingChain(knobs: MasterKnobParams = {}): string {
   const width = clamp(knobs.stereoWidth ?? 1.15, 0, 2);
   const limit = clamp(knobs.limitLevel ?? 0.95, 0.1, 1);
 
-  // EQ → acompressor → stereotools → alimiter (loudnorm appended by caller)
+  // EQ â†’ acompressor â†’ stereotools â†’ alimiter (loudnorm appended by caller)
   const parts = [
     `equalizer=f=100:width_type=h:width=200:g=${bass.toFixed(2)}`,
     `equalizer=f=1000:width_type=q:width=1.0:g=${mid.toFixed(2)}`,
@@ -188,7 +188,7 @@ function codecArgs(format: ExportFormat, output: string): string[] {
 
 /**
  * Build a sibling *_master path that never equals the source.
- * e.g. song.flac → song_master.wav
+ * e.g. song.flac â†’ song_master.wav
  */
 export function buildMasterOutputPath(sourcePath: string, format: ExportFormat): string {
   const dir = path.dirname(sourcePath);
@@ -199,8 +199,8 @@ export function buildMasterOutputPath(sourcePath: string, format: ExportFormat):
   if (path.resolve(candidate) === path.resolve(sourcePath)) {
     candidate = path.join(dir, `${clean}_master_out.${format}`);
   }
-  // If file exists, add numeric suffix rather than overwrite a previous master optionally —
-  // requirement is never overwrite *source*; overwriting prior master of same name is OK for re-render.
+  // Intentional: re-render overwrites an existing sibling *_master.* (ffmpeg -y).
+  // Source path is never the candidate (guard above). Prior masters can be versioned later if needed.
   return candidate;
 }
 
@@ -233,7 +233,7 @@ export async function masterTrack(
     if (!src.cleanup) {
       outputPath = buildMasterOutputPath(src.path, format);
     } else {
-      // Remote/temp source — write under LOCAL_AUDIO_DIR/masters/
+      // Remote/temp source â€” write under LOCAL_AUDIO_DIR/masters/
       const mastersDir = path.join(LOCAL_AUDIO_DIR, 'masters');
       fs.mkdirSync(mastersDir, { recursive: true });
       const stamp = Date.now();
@@ -248,7 +248,7 @@ export async function masterTrack(
     const loudnormMeasure = `loudnorm=I=${preset.I}:TP=${preset.TP}:LRA=${preset.LRA}:print_format=json`;
     const afPass1 = `${processing},${loudnormMeasure}`;
 
-    // Pass 1 — measure
+    // Pass 1 â€” measure
     const pass1 = await runFfmpeg([
       '-y', '-hide_banner', '-i', src.path,
       '-af', afPass1,

@@ -176,7 +176,7 @@ function AppContent() {
   const handleLeftSidebarToggle = useCallback(() => {
     setShowLeftSidebar((open) => {
       if (!open) {
-        // Expanding from icons — restore last expanded width from localStorage
+        // Expanding from icons Ã¢â‚¬â€ restore last expanded width from localStorage
         try {
           const stored = localStorage.getItem(SIDEBAR_WIDTH_KEY);
           if (stored) {
@@ -214,7 +214,7 @@ function AppContent() {
         return;
       }
 
-      // Expanded: drag below snap threshold → icon-only, stop resize (keep last expanded width)
+      // Expanded: drag below snap threshold Ã¢â€ â€™ icon-only, stop resize (keep last expanded width)
       if (raw < SIDEBAR_SNAP_THRESHOLD) {
         setShowLeftSidebar(false);
         setIsResizingSidebar(false);
@@ -243,7 +243,7 @@ function AppContent() {
   }, [isResizingSidebar, clampSidebarWidth]);
 
   useEffect(() => {
-    // Only persist expanded widths — never overwrite with collapsed/snap state
+    // Only persist expanded widths Ã¢â‚¬â€ never overwrite with collapsed/snap state
     if (isResizingSidebar || !showLeftSidebar) return;
     try {
       localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
@@ -789,7 +789,7 @@ function AppContent() {
           setIsPlaying(prev => !prev);
         }
       } else {
-        // No song selected — play first available
+        // No song selected Ã¢â‚¬â€ play first available
         const available = songs.filter(s => s.audioUrl && !s.isGenerating);
         if (available.length > 0) {
           playSong(available[0], available);
@@ -1382,6 +1382,15 @@ function AppContent() {
     setIsVideoModalOpen(true);
   };
 
+  const openMasterTrack = (song: Song) => {
+    if (isPlaying) {
+      setIsPlaying(false);
+      if (audioRef.current) audioRef.current.pause();
+    }
+    setSongForMaster(song);
+    setIsMasterModalOpen(true);
+  };
+
   // Handle username setup
   const handleUsernameSubmit = async (username: string) => {
     await setupUser(username);
@@ -1501,7 +1510,7 @@ function AppContent() {
               />
             </div>
 
-            {/* Draggable divider — invisible track, only the small muted pill (like lyrics/style) */}
+            {/* Draggable divider Ã¢â‚¬â€ invisible track, only the small muted pill (like lyrics/style) */}
             <div
               role="separator"
               aria-orientation="vertical"
