@@ -2,11 +2,16 @@
 title Phoenix Music Maker UI
 REM Phoenix Music Maker Complete Startup Script for Windows
 REM Starts Phoenix Engine + Backend + Frontend
-setlocal
-
-REM Never open Chrome from start-all — babyUFO uses existing PMM tab
-set "PHOENIX_SKIP_BROWSER=1"
-set "PMM_SKIP_BROWSER=1" EnableDelayedExpansion
+setlocal EnableDelayedExpansion
+
+
+
+REM Never open Chrome from start-all — babyUFO uses existing PMM tab
+
+set "PHOENIX_SKIP_BROWSER=1"
+
+set "PMM_SKIP_BROWSER=1"
+
 
 echo ==================================
 echo   Phoenix Music Maker Complete Startup
@@ -29,6 +34,7 @@ if not exist "server\node_modules" (
 )
 
 REM Resolve Phoenix Engine path (never use ace-step / ACE-Step-1.5)
+if "%PHOENIX_ENGINE_PATH%"=="" set "PHOENIX_ENGINE_PATH=E:\Phoenix-Engine"
 if not "%PHOENIX_ENGINE_PATH%"=="" (
     set ACESTEP_PATH=%PHOENIX_ENGINE_PATH%
 )
@@ -42,7 +48,7 @@ if not exist "E:\Phoenix-Engine\" (
     exit /b 1
 )
 if not exist "%ACESTEP_PATH%" set ACESTEP_PATH=E:\Phoenix-Engine
-echo [+] Phoenix Engine path: %ACESTEP_PATH%
+echo [+] Phoenix Engine path: %PHOENIX_ENGINE_PATH% (compat ACESTEP_PATH=%ACESTEP_PATH%)
 REM Prefer non-turbo DiT so inference steps >8 are not clamped to 8 by turbo.
 REM Must set BEFORE the ( ) block ? cmd expands %VAR% at parse time inside blocks.
 REM Prefer Phoenix checkpoint names when present.
@@ -112,8 +118,14 @@ echo Waiting for API to initialize...
 timeout /t 5 /nobreak >nul
 
 REM Start backend in new window
-echo [2/3] Starting backend server...
-start "Phoenix Music Maker UI Backend" cmd /k "cd /d %~dp0server && title Phoenix Music Maker UI Backend && npm run dev"
+echo [2/3] Starting backend server...
+netstat -ano | findstr ":3001" | findstr "LISTENING" >nul
+if %ERRORLEVEL%==0 (
+    echo [!] Port 3001 already LISTENING — skipping second backend (refuses dual instance / EADDRINUSE).
+    echo [!] If you need a clean replace: set PHOENIX_SERVER_REPLACE=1 then restart backend once.
+) else (
+    start "Phoenix Music Maker UI Backend" cmd /k "cd /d %~dp0server && title Phoenix Music Maker UI Backend && npm run dev"
+)
 
 REM Wait for backend to start
 echo Waiting for backend to start...

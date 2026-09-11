@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "db:migrate": "tsx src/db/migrate.ts",
-    "storage:test": "tsx src/scripts/test-storage.ts"
+    "storage:test": "tsx src/scripts/test-storage.ts",
+    "dev:watch": "tsx watch --exclude ./data --exclude \"**/*.log\" --exclude ./dit-steps-debug.log --exclude ./bpm-debug.log --exclude ./public src/index.ts"
   },
   "dependencies": {
     "@gradio/client": "^2.0.4",

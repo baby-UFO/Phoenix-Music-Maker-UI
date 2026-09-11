@@ -12,6 +12,8 @@ dotenv.config({ path: path.join(__dirname_init, '../../.env') });
 // Also load server/.env (Create / Phoenix Engine paths live here)
 dotenv.config({ path: path.join(__dirname_init, '../.env'), override: true });
 import cron from 'node-cron';
+import net from 'net';
+import { execSync } from 'child_process';
 import { config } from './config/index.js';
 import { runCleanupJob, cleanupDeletedSongs } from './services/cleanup.js';
 
@@ -473,6 +475,57 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
+
+/** Refuse dual :PORT listeners (EADDRINUSE → enqueue miss / HOL). Optional one-shot replace. */
+async function assertSingleServerInstance(port: number): Promise<void> {
+  const portTaken = await new Promise<boolean>((resolve) => {
+    const tester = net.createServer();
+    tester.once('error', () => resolve(true));
+    tester.once('listening', () => {
+      tester.close(() => resolve(false));
+    });
+    tester.listen(port, '0.0.0.0');
+  });
+  if (!portTaken) return;
+
+  const replace =
+    process.env.PHOENIX_SERVER_REPLACE === '1' ||
+    process.env.PMM_SERVER_REPLACE === '1';
+
+  if (!replace) {
+    console.error(
+      `[Boot] Port ${port} already in use — refusing second Phoenix Music Maker server instance.\n` +
+        `Fix: stop the other Node on :${port}, or set PHOENIX_SERVER_REPLACE=1 for a one-shot replace.`,
+    );
+    process.exit(1);
+  }
+
+  try {
+    const out = execSync('netstat -ano', { encoding: 'utf8', windowsHide: true });
+    const pids = new Set<string>();
+    const re = new RegExp(`:${port}\\s`);
+    for (const line of out.split(/\r?\n/)) {
+      if (!/LISTENING/i.test(line) || !re.test(line)) continue;
+      const parts = line.trim().split(/\s+/);
+      const pid = parts[parts.length - 1];
+      if (pid && pid !== String(process.pid)) pids.add(pid);
+    }
+    for (const pid of pids) {
+      console.warn(`[Boot] PHOENIX_SERVER_REPLACE=1 — killing PID ${pid} on :${port}`);
+      try {
+        execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore', windowsHide: true });
+      } catch (e) {
+        console.warn(`[Boot] taskkill ${pid} failed:`, e);
+      }
+    }
+    // Brief settle before listen
+    await new Promise((r) => setTimeout(r, 500));
+  } catch (e) {
+    console.error('[Boot] Failed to replace port occupant:', e);
+    process.exit(1);
+  }
+}
+
 // Schedule cleanup job to run daily at 3 AM
 cron.schedule('0 3 * * *', async () => {
   console.log('Running scheduled cleanup job...');
@@ -484,24 +537,30 @@ cron.schedule('0 3 * * *', async () => {
   }
 });
 
-// Start server on all interfaces for LAN access
-app.listen(config.port, '0.0.0.0', () => {
-  console.log(`Phoenix Music Maker Server running on http://localhost:${config.port}`);
-  console.log(`Environment: ${config.nodeEnv}`);
-  console.log(`Phoenix Engine API: ${config.phoenixEngine.apiUrl}`);
+// Start server on all interfaces for LAN access (single-instance :PORT)
+void (async () => {
+  await assertSingleServerInstance(config.port);
+  app.listen(config.port, '0.0.0.0', () => {
+    console.log(`Phoenix Music Maker Server running on http://localhost:${config.port}`);
+    console.log(`Environment: ${config.nodeEnv}`);
+    console.log(`Phoenix Engine API: ${config.phoenixEngine.apiUrl}`);
 
-  // Clear eternal queued/running ghosts left after Node bounce (in-memory map empty)
-  void reconcileOrphanGenerationJobs();
+    // Clear eternal queued/running ghosts left after Node bounce (in-memory map empty)
+    void reconcileOrphanGenerationJobs();
 
-  // Show LAN access info
-  import('os').then(os => {
-    const nets = os.networkInterfaces();
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name] || []) {
-        if (net.family === 'IPv4' && !net.internal) {
-          console.log(`LAN access: http://${net.address}:${config.port}`);
+    // Show LAN access info
+    import('os').then(os => {
+      const nets = os.networkInterfaces();
+      for (const name of Object.keys(nets)) {
+        for (const netInfo of nets[name] || []) {
+          if (netInfo.family === 'IPv4' && !netInfo.internal) {
+            console.log(`LAN access: http://${netInfo.address}:${config.port}`);
+          }
         }
       }
-    }
+    });
   });
+})().catch((e) => {
+  console.error('[Boot] failed to start server:', e);
+  process.exit(1);
 });
