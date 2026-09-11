@@ -555,7 +555,7 @@ const SongItem: React.FC<SongItemProps> = ({
 
                 {song.isGenerating ? (
                     <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1">
-                        {/* Always show music-bar-anim while generating; Queue # / Creating… are labels only */}
+                        {/* music-bar-anim ONLY while generating — no Creating…/Queued… text labels */}
                         <div className="flex items-end gap-1 h-6">
                             <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.0s' }}></div>
                             <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
@@ -609,7 +609,7 @@ const SongItem: React.FC<SongItemProps> = ({
                                     }
                                 }}
                             >
-                                {song.title || (song.isGenerating ? (song.queuePosition ? "Queued..." : "Creating...") : "Untitled")}
+                                {song.title || (song.isGenerating ? "" : "Untitled")}
                             </h3>
                         )}
                         
@@ -732,9 +732,8 @@ const SongItem: React.FC<SongItemProps> = ({
             {/* Timestamp */}
             <div className="text-xs font-mono text-zinc-500 dark:text-zinc-600 self-start pt-1">
                 {song.isGenerating ? (
-                    <span className={song.queuePosition ? 'text-amber-500' : 'text-emerald-500'}>
-                        {song.queuePosition ? `#${song.queuePosition}` : 'Creating...'}
-                    </span>
+                    /* bars-only: no Creating…/Queued… text in duration column */
+                    <span className="text-transparent select-none" aria-hidden>|</span>
                 ) : song.duration}
             </div>
         </div>
