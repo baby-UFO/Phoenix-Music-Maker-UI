@@ -1,16 +1,9 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getGradioClient } from '../services/gradio-client.js';
+import { bootDitLooksTurbo, loraState, setLoraState } from '../services/loraGuard.js';
 
 const router = Router();
-
-// Local LoRA state tracking (Gradio doesn't have a dedicated status endpoint)
-let loraState = {
-  loaded: false,
-  active: false,
-  scale: 1.0,
-  path: '',
-};
 
 // POST /api/lora/load — Load a LoRA adapter
 router.post('/load', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
@@ -21,11 +14,18 @@ router.post('/load', authMiddleware, async (req: AuthenticatedRequest, res: Resp
       return;
     }
 
+    if (bootDitLooksTurbo()) {
+      res.status(409).json({
+        error: 'LoRA load blocked: Phoenix Engine is on Turbo DiT. Unload/switch to SFT/base before loading SFT LoRA.',
+      });
+      return;
+    }
+
     const client = await getGradioClient();
     const result = await client.predict('/load_lora', [lora_path]);
     const status = (result.data as unknown[])[0] as string;
 
-    loraState = { loaded: true, active: true, scale: loraState.scale, path: lora_path };
+    setLoraState({ loaded: true, active: true, path: lora_path });
 
     res.json({ message: status, lora_path, loaded: true });
   } catch (error) {
@@ -41,7 +41,7 @@ router.post('/unload', authMiddleware, async (_req: AuthenticatedRequest, res: R
     const result = await client.predict('/unload_lora', []);
     const status = (result.data as unknown[])[0] as string;
 
-    loraState = { loaded: false, active: false, scale: 1.0, path: '' };
+    setLoraState({ loaded: false, active: false, scale: 1.0, path: '' });
 
     res.json({ message: status });
   } catch (error) {
@@ -63,7 +63,7 @@ router.post('/scale', authMiddleware, async (req: AuthenticatedRequest, res: Res
     const result = await client.predict('/set_lora_scale', [scale]);
     const status = (result.data as unknown[])[0] as string;
 
-    loraState.scale = scale;
+    setLoraState({ scale });
 
     res.json({ message: status, scale });
   } catch (error) {
@@ -78,11 +78,18 @@ router.post('/toggle', authMiddleware, async (req: AuthenticatedRequest, res: Re
     const { enabled } = req.body;
     const useLoRA = typeof enabled === 'boolean' ? enabled : !loraState.active;
 
+    if (useLoRA && bootDitLooksTurbo()) {
+      res.status(409).json({
+        error: 'LoRA enable blocked: Phoenix Engine is on Turbo DiT. SFT LoRA is not allowed on Turbo.',
+      });
+      return;
+    }
+
     const client = await getGradioClient();
     const result = await client.predict('/set_use_lora', [useLoRA]);
     const status = (result.data as unknown[])[0] as string;
 
-    loraState.active = useLoRA;
+    setLoraState({ active: useLoRA });
 
     res.json({ message: status, active: useLoRA });
   } catch (error) {
@@ -93,7 +100,7 @@ router.post('/toggle', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
 // GET /api/lora/status — Get current LoRA state
 router.get('/status', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
-  res.json(loraState);
+  res.json({ ...loraState });
 });
 
 export default router;

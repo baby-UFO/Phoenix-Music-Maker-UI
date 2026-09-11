@@ -21,6 +21,7 @@ function getAudioDuration(filePath: string): number {
 import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
 import { getGradioClient, resetGradioClient, isGradioAvailable, setInFlightGradioClient, forceCloseGradioSockets } from './gradio-client.js';
+import { ensureLoraOffForTurbo } from './loraGuard.js';
 import { toEngineModelId, toPhoenixModelId } from '../utils/phoenixModels.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -634,8 +635,10 @@ function gradioPredictTimeoutMs(params: GenerationParams): number {
   if (Number.isFinite(envMs) && envMs > 0) return envMs;
   const duration = Number(params.duration) || 120;
   const steps = Number(params.inferenceSteps) || 8;
-  // Base 3min + duration*2s + steps*5s, clamp 3–20 min
-  return Math.min(1_200_000, Math.max(180_000, 180_000 + duration * 2000 + steps * 5000));
+  const turbo = !!(params.ditModel && /turbo/i.test(params.ditModel));
+  // Turbo: tighter default (base 2.5min); non-turbo: base 3min. Clamp →20 min.
+  const base = turbo ? 150_000 : 180_000;
+  return Math.min(1_200_000, Math.max(base, base + duration * 2000 + steps * 5000));
 }
 
 
@@ -1049,6 +1052,11 @@ async function processGenerationViaGradio(
   }
   if (params.lmModel) params.lmModel = toEngineModelId(params.lmModel);
 
+  // Turbo must never run with SFT LoRA loaded
+  if (isTurboDitModel(params.ditModel)) {
+    await ensureLoraOffForTurbo(`predict ${jobId} dit=${params.ditModel}`);
+  }
+
   const client = await getGradioClient();
   setInFlightGradioClient(client);
   const args = await buildGradioArgs(params);
@@ -1105,13 +1113,14 @@ async function processGenerationViaGradio(
       predictMs,
       `Gradio predict ${jobId}`,
       () => {
-        console.log(`[Gradio] aborted predict for ${jobId}, client closed`);
-        resetGradioClient();
+        console.log(`[Gradio] aborted predict for ${jobId}, force-closing sockets`);
+        forceCloseGradioSockets();
       },
     );
   } catch (predictErr) {
     console.error(`[Gradio] predict failed/timeout for ${jobId}:`, predictErr);
     setInFlightGradioClient(null);
+    forceCloseGradioSockets();
     resetGradioClient();
     throw predictErr;
   }
