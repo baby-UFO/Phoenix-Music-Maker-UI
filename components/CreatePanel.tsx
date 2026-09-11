@@ -1687,6 +1687,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         repaintingEnd,
         instruction,
         audioCoverStrength,
+        coverNoiseStrength: 0,
         taskType,
         useAdg,
         cfgIntervalStart,
