@@ -647,18 +647,31 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
             return;
           }
           if (data?.restarted) {
-            console.log('[CreatePanel] Phoenix Engine restarted for', targetDit, '— reloading LoRA');
-            try {
-              if (loraPath.trim()) {
-                await generateApi.loadLora({ lora_path: loraPath }, token);
-                if (loraScale !== 1) await generateApi.setLoraScale({ scale: loraScale }, token);
-                if (!loraEnabled) await generateApi.toggleLora({ enabled: false }, token);
-                setLoraLoaded(true);
+            const turboDit = /turbo/i.test(String(targetDit));
+            if (turboDit) {
+              // SFT LoRA v5 is 2048-dim — must NOT ride Turbo DiT (garbage noise).
+              console.log('[CreatePanel] Phoenix Engine restarted for', targetDit, '- skipping LoRA on turbo');
+              try {
+                await generateApi.unloadLora(token);
+                setLoraLoaded(false);
+              } catch (e) {
+                console.warn('[CreatePanel] LoRA unload after turbo DiT restart failed', e);
               }
-            } catch (e) {
-              console.warn('[CreatePanel] LoRA reload after DiT restart failed', e);
+            } else {
+              console.log('[CreatePanel] Phoenix Engine restarted for', targetDit, '- reloading LoRA');
+              try {
+                if (loraPath.trim()) {
+                  await generateApi.loadLora({ lora_path: loraPath }, token);
+                  if (loraScale !== 1) await generateApi.setLoraScale({ scale: loraScale }, token);
+                  if (!loraEnabled) await generateApi.toggleLora({ enabled: false }, token);
+                  setLoraLoaded(true);
+                }
+              } catch (e) {
+                console.warn('[CreatePanel] LoRA reload after DiT restart failed', e);
+              }
             }
           }
+          
         } catch (e) {
           console.warn('[CreatePanel] ensure-dit error', e);
         }
