@@ -779,6 +779,10 @@ async function readLiveEngineConfigPath(): Promise<string | null> {
         const cmd = String(stdout || '');
         const m = cmd.match(/--config_path\s+(\S+)/i);
         if (m?.[1]) return toPhoenixModelId(m[1]);
+        // noquant launcher keeps --config_path in sys.argv only — trust status file it writes at boot
+        if (/launch_phoenix_engine_noquant\.py/i.test(cmd)) {
+          return readEngineBootConfig();
+        }
       } catch {
         /* try next pid */
       }
@@ -805,7 +809,7 @@ function writeEngineBootConfig(configPath: string, isTurbo: boolean): void {
 }
 
 /** Restart Phoenix Engine with --config_path matching the Quality chip (boot-only DiT select). */
-export async function ensureEngineBootConfig(ditModel: string): Promise<{ restarted: boolean; configPath: string }> {
+export async function ensureEngineBootConfig(ditModel: string, opts?: { force?: boolean }): Promise<{ restarted: boolean; configPath: string }> {
   // Brand: Turbo ensure-dit MUST boot phoenix-v15-turbo (not sft, not acestep-*)
   let phoenixId = toPhoenixModelId(ditModel);
   if (isTurboDitModel(phoenixId) || isTurboDitModel(ditModel)) {
@@ -813,10 +817,16 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
   }
   const statusBoot = readEngineBootConfig();
   const liveBoot = await readLiveEngineConfigPath();
-  // Brand: Quality chip ALWAYS kills :8001 then boots selected DiT — never skip on status JSON
-  // (status lied turbo while live process was still phoenix-v15-sft)
+  const force = opts?.force === true;
+  // Quality chip (force): ALWAYS kill :8001 then boot selected DiT.
+  // Internal generate path (no force): skip restart when live already matches (phoenix/acestep equivalent).
+  if (!force && liveBoot === phoenixId) {
+    if (statusBoot !== phoenixId) writeEngineBootConfig(phoenixId, /turbo/i.test(phoenixId));
+    lastRequestedDitModel = phoenixId;
+    return { restarted: false, configPath: phoenixId };
+  }
   console.log(
-    `[Model] ensure-dit ALWAYS restart → ${phoenixId} (live=${liveBoot ?? 'none'}, status=${statusBoot ?? 'none'})`,
+    `[Model] ensure-dit ${force ? 'FORCE' : 'restart'} → ${phoenixId} (live=${liveBoot ?? 'none'}, status=${statusBoot ?? 'none'})`,
   );
 
   if (!isCheckpointOnDisk(phoenixId)) {
@@ -910,56 +920,58 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
 }
 
 async function switchModelIfNeeded(ditModel: string): Promise<void> {
-  ditModel = toEngineModelId(ditModel);
+  const phoenixId = toPhoenixModelId(ditModel);
+  const engineId = toEngineModelId(ditModel);
   const activeModel = await getActiveModel();
-  if (activeModel === ditModel) {
-    console.log(`[Model] Already targeting '${ditModel}' (tracked active)`);
+  // phoenix-v15-turbo and acestep-v15-turbo are the same DiT — never restart mid-Create
+  if (activeModel && toPhoenixModelId(activeModel) === phoenixId) {
+    lastRequestedDitModel = phoenixId;
+    console.log(`[Model] Already targeting '${phoenixId}' (tracked active)`);
     return;
   }
 
-  if (!isCheckpointOnDisk(ditModel)) {
-    const phoenixId = toPhoenixModelId(ditModel);
+  if (!isCheckpointOnDisk(phoenixId) && !isCheckpointOnDisk(engineId)) {
     const hint = `Phoenix DiT checkpoint '${phoenixId}' is not on disk. ` +
       `Download the matching Phoenix Engine checkpoint for ${phoenixId}, ` +
       `then restart Phoenix Engine with --config_path ${phoenixId}.`;
-    console.error(`[Model] missing engine folder ${checkpointDirFor(ditModel)} (UI id ${phoenixId})`);
+    console.error(`[Model] missing engine folder for ${phoenixId}`);
     throw new Error(hint);
   }
 
-  console.log(`[Model] Switching from '${activeModel ?? 'unknown'}' to '${ditModel}'`);
+  const boot = readEngineBootConfig();
+  if (boot === phoenixId) {
+    lastRequestedDitModel = phoenixId;
+    console.log(`[Model] Boot status already '${phoenixId}' — skip switch`);
+    return;
+  }
+
+  console.log(`[Model] Switching from '${activeModel ?? 'unknown'}' to '${phoenixId}'`);
   try {
     const res = await fetch(`${ENGINE_API}/v1/init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: ditModel, init_llm: false }),
+      body: JSON.stringify({ model: engineId, init_llm: false }),
     });
 
     if (res.ok) {
-      lastRequestedDitModel = ditModel;
-      console.log(`[Model] Switched to '${ditModel}' via /v1/init`);
+      lastRequestedDitModel = phoenixId;
+      console.log(`[Model] Switched to '${phoenixId}' via /v1/init`);
       return;
     }
 
     if (res.status === 404) {
-      // Gradio portable build: no runtime /v1/init Ã¢â‚¬â€ restart with matching --config_path when needed.
-      const boot = readEngineBootConfig();
-      if (boot && boot === ditModel) {
-        lastRequestedDitModel = ditModel;
-        console.log(`[Model] /v1/init 404 but boot status already '${ditModel}'`);
-        return;
-      }
-      console.warn(`[Model] /v1/init 404; ensuring boot config_path=${ditModel}`);
-      await ensureEngineBootConfig(ditModel);
+      console.warn(`[Model] /v1/init 404; ensuring boot config_path=${phoenixId}`);
+      await ensureEngineBootConfig(phoenixId); // no force — skip if live already matches
       return;
     }
 
     const err = await res.text().catch(() => '');
-    throw new Error(`Model switch to '${toPhoenixModelId(ditModel)}' failed: ${res.status} ${err}`);
+    throw new Error(`Model switch to '${phoenixId}' failed: ${res.status} ${err}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('404') || /fetch failed|ECONNREFUSED/i.test(msg)) {
-      lastRequestedDitModel = ditModel;
-      console.warn(`[Model] /v1/init unreachable (${msg}); continuing with requested '${ditModel}' (boot config_path must match).`);
+      lastRequestedDitModel = phoenixId;
+      console.warn(`[Model] /v1/init unreachable (${msg}); continuing with requested '${phoenixId}' (boot config_path must match).`);
       return;
     }
     throw e;

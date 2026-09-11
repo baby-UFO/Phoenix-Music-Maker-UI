@@ -802,7 +802,7 @@ router.post('/ensure-dit', authMiddleware, async (req: AuthenticatedRequest, res
       res.status(400).json({ error: 'ditModel is required (phoenix-v15-turbo|base|sft)' });
       return;
     }
-    const result = await ensureEngineBootConfig(ditModel);
+    const result = await ensureEngineBootConfig(ditModel, { force: true });
     res.json({
       ok: true,
       restarted: result.restarted,
