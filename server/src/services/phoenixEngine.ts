@@ -826,7 +826,7 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
     );
   }
 
-  console.log(`[Model] Boot DiT mismatch (status=${boot ?? 'none'}, wanted=${phoenixId}) — restarting Phoenix Engine...`);
+  console.log(`[Model] Boot DiT mismatch (status=${statusBoot ?? 'none'}, live=${liveBoot ?? 'none'}, wanted=${phoenixId}) — restarting Phoenix Engine...`);
 
   // Fail in-flight jobs + free Gradio slot BEFORE taskkill (orphaned await wedges HOL otherwise)
   for (const [jid, j] of activeJobs.entries()) {
