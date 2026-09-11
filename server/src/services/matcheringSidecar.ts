@@ -1,7 +1,7 @@
 /**
  * Matchering sidecar probe — NEVER imports Matchering into PMM core.
  * Preferred: Docker sergree/matchering-web on 127.0.0.1:8360
- * Fallback: isolated CLI under E:\Phoenix-Tools\matchering-sidecar
+ * Fallback: isolated CLI under E:\Phoenix-Tools\matchering-sidecar (mg_cli.py)
  * GPLv3 stays quarantined outside Phoenix Music Maker / Phoenix Engine.
  */
 import { spawn } from 'node:child_process';
@@ -21,6 +21,20 @@ export interface MatcheringStatus {
   license: string;
 }
 
+const GPL_NOTE = 'GPLv3 (sidecar only — not part of Phoenix Music Maker core)';
+
+function cliPython(): string {
+  return path.join(TOOLS_DIR, 'venv', 'Scripts', 'python.exe');
+}
+
+function cliScript(): string {
+  return path.join(TOOLS_DIR, 'mg_cli.py');
+}
+
+function cliBat(): string {
+  return path.join(TOOLS_DIR, 'matchering-cli.bat');
+}
+
 export async function probeMatchering(): Promise<MatcheringStatus> {
   try {
     const ctrl = new AbortController();
@@ -32,23 +46,26 @@ export async function probeMatchering(): Promise<MatcheringStatus> {
         available: true,
         backend: 'docker-http',
         detail: `Reachable at ${DOCKER_BASE}`,
-        license: 'GPLv3 (sidecar only — not part of Phoenix Music Maker core)',
+        license: GPL_NOTE,
       };
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
-  const py = path.join(TOOLS_DIR, 'venv', 'Scripts', 'python.exe');
-  const bat = path.join(TOOLS_DIR, 'matchering-cli.bat');
+  const py = cliPython();
+  const mg = cliScript();
+  const bat = cliBat();
   // Require isolated venv python so an empty bat stub is not "available"
-  if (fs.existsSync(py)) {
-    const detail = fs.existsSync(bat)
-      ? `CLI+venv at ${bat}`
-      : `venv python at ${py} (use: python -m matchering …)`;
+  if (fs.existsSync(py) && (fs.existsSync(mg) || fs.existsSync(bat))) {
+    const detail = fs.existsSync(mg)
+      ? `CLI mg_cli.py + venv at ${TOOLS_DIR}`
+      : `CLI+venv at ${bat}`;
     return {
       available: true,
       backend: 'cli',
       detail,
-      license: 'GPLv3 (sidecar only — not part of Phoenix Music Maker core)',
+      license: GPL_NOTE,
     };
   }
 
@@ -56,7 +73,7 @@ export async function probeMatchering(): Promise<MatcheringStatus> {
     available: false,
     backend: 'unavailable',
     detail: `No Matchering sidecar. Start Docker (sergree/matchering-web on ${DOCKER_BASE}) or install CLI under ${TOOLS_DIR}. Core FFmpeg master still works.`,
-    license: 'GPLv3 (sidecar only — not part of Phoenix Music Maker core)',
+    license: GPL_NOTE,
   };
 }
 
@@ -77,22 +94,41 @@ export async function tryReferenceMatch(opts: {
   );
 
   if (status.backend === 'cli') {
-    const py = path.join(TOOLS_DIR, 'venv', 'Scripts', 'python.exe');
-    const cliBat = path.join(TOOLS_DIR, 'matchering-cli.bat');
-    const cmd = fs.existsSync(cliBat) ? cliBat : py;
-    const fullArgs = fs.existsSync(cliBat)
-      ? [opts.targetPath, opts.referencePath, out]
-      : ['-m', 'matchering', opts.targetPath, opts.referencePath, out];
+    const py = cliPython();
+    const mg = cliScript();
+    const bat = cliBat();
+
+    let cmd: string;
+    let args: string[];
+    if (fs.existsSync(mg) && fs.existsSync(py)) {
+      cmd = py;
+      args = [mg, opts.targetPath, opts.referencePath, out];
+    } else if (fs.existsSync(bat)) {
+      cmd = bat;
+      args = [opts.targetPath, opts.referencePath, out];
+    } else {
+      return null;
+    }
 
     const ok = await new Promise<boolean>((resolve) => {
-      const proc = spawn(cmd, fullArgs, { windowsHide: true, cwd: TOOLS_DIR });
+      const proc = spawn(cmd, args, { windowsHide: true, cwd: TOOLS_DIR });
+      let stderr = '';
+      proc.stderr?.on('data', (d) => {
+        stderr += d.toString();
+      });
       proc.on('error', () => resolve(false));
-      proc.on('close', (code) => resolve(code === 0 && fs.existsSync(out)));
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          console.warn('[matcheringSidecar] CLI exit', code, stderr.slice(-400));
+        }
+        resolve(code === 0 && fs.existsSync(out));
+      });
     });
     if (!ok) return null;
     return { outputPath: out, backend: 'cli' };
   }
 
+  // docker-http: POST files to sidecar (no import matchering in PMM)
   try {
     const form = new FormData();
     const targetBuf = fs.readFileSync(opts.targetPath);

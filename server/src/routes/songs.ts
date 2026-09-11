@@ -12,6 +12,7 @@ import {
   isExportFormat,
   materializeAudioForExport,
   safeDownloadName,
+  LOCAL_AUDIO_DIR,
   type ExportFormat,
 } from '../services/ffmpegExport.js';
 import {
@@ -22,9 +23,33 @@ import {
   type MasterPresetId,
   type MasterKnobParams,
 } from '../services/masterTrack.js';
-import { probeMatchering } from '../services/matcheringSidecar.js';
+import { probeMatchering, tryReferenceMatch } from '../services/matcheringSidecar.js';
+import multer from 'multer';
+import os from 'node:os';
 
 const router = Router();
+
+/** Optional reference WAV/audio for Matchering — never required for core FFmpeg master. */
+const masterRefUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, file, cb) => {
+      const safe = (file.originalname || 'reference').replace(/[^a-zA-Z0-9._-]/g, '_');
+      cb(null, `pmm-ref-${Date.now()}-${safe}`);
+    },
+  }),
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
+
+function maybeMasterRefUpload(req: AuthenticatedRequest, res: Response, next: (err?: unknown) => void) {
+  const ct = String(req.headers['content-type'] || '');
+  if (ct.includes('multipart/form-data')) {
+    masterRefUpload.single('reference')(req as any, res as any, next as any);
+    return;
+  }
+  next();
+}
+
 
 // Helper: resolve audio URL (generates signed URL for S3)
 async function resolveAudioUrl(audioUrl: string | null): Promise<string | null> {
@@ -181,7 +206,12 @@ router.get('/:id/download', optionalAuthMiddleware, async (req: AuthenticatedReq
 
 // Master this track - FFmpeg EQ -> acompressor -> stereotools -> alimiter -> 2-pass loudnorm
 // Writes *_master.<ext> next to source (never overwrites source). Phoenix Music Maker.
-router.post('/:id/master', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+// Optional Matchering: multipart field "reference" + referenceMatch=true (sidecar only; skip on failure).
+router.post('/:id/master', optionalAuthMiddleware, maybeMasterRefUpload, async (req: AuthenticatedRequest, res: Response) => {
+  const refFile = (req as any).file as Express.Multer.File | undefined;
+  const cleanupPaths: string[] = [];
+  if (refFile?.path) cleanupPaths.push(refFile.path);
+
   try {
     const available = await isFfmpegAvailable();
     if (!available) {
@@ -204,7 +234,10 @@ router.post('/:id/master', optionalAuthMiddleware, async (req: AuthenticatedRequ
     const format = formatRaw as ExportFormat;
 
     const knobs: MasterKnobParams = {};
-    const bodyKnobs = req.body?.knobs || {};
+    let bodyKnobs = req.body?.knobs || {};
+    if (typeof bodyKnobs === 'string') {
+      try { bodyKnobs = JSON.parse(bodyKnobs); } catch { bodyKnobs = {}; }
+    }
     for (const key of ['bassDb', 'midDb', 'trebleDb', 'compThreshold', 'compRatio', 'stereoWidth', 'limitLevel'] as const) {
       if (bodyKnobs[key] !== undefined && bodyKnobs[key] !== null && bodyKnobs[key] !== '') {
         const n = Number(bodyKnobs[key]);
@@ -230,7 +263,29 @@ router.post('/:id/master', optionalAuthMiddleware, async (req: AuthenticatedRequ
       return;
     }
 
-    const mastered = await masterTrack(song.audio_url, { preset, format, knobs });
+    const wantMatch = String(req.body?.referenceMatch || '').toLowerCase() === 'true' || req.body?.referenceMatch === true;
+    let masterInput: string = song.audio_url;
+    let matchering: { used: boolean; backend?: string } = { used: false };
+
+    if (wantMatch && refFile?.path) {
+      const src = await materializeAudioForExport(song.audio_url);
+      if (src.cleanup) cleanupPaths.push(src.path);
+      const matched = await tryReferenceMatch({ targetPath: src.path, referencePath: refFile.path });
+      if (matched?.outputPath) {
+        cleanupPaths.push(matched.outputPath);
+        // Park matched WAV under public audio masters/ so *_master gets a /audio URL
+        const mastersDir = path.join(LOCAL_AUDIO_DIR, 'masters');
+        fs.mkdirSync(mastersDir, { recursive: true });
+        const placed = path.join(mastersDir, `match_${Date.now()}.wav`);
+        fs.copyFileSync(matched.outputPath, placed);
+        cleanupPaths.push(placed);
+        masterInput = placed;
+        matchering = { used: true, backend: matched.backend };
+      }
+      // If Matchering unavailable/failed, fall through to FFmpeg-only on original
+    }
+
+    const mastered = await masterTrack(masterInput, { preset, format, knobs });
 
     res.json({
       success: true,
@@ -248,10 +303,15 @@ router.post('/:id/master', optionalAuthMiddleware, async (req: AuthenticatedRequ
       },
       meters: mastered.meters,
       title: song.title,
+      matchering,
     });
   } catch (error) {
     console.error('Master track error:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Master failed' });
+  } finally {
+    for (const pth of cleanupPaths) {
+      try { fs.unlinkSync(pth); } catch { /* ignore */ }
+    }
   }
 });
 

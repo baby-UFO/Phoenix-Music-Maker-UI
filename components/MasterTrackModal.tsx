@@ -361,32 +361,44 @@ export const MasterTrackModal: React.FC<MasterTrackModalProps> = ({ isOpen, song
     setResult(null);
     setStatus(t('masterRendering') || 'Rendering master with Phoenix Engine…');
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      const body: Record<string, unknown> = {
-        preset,
-        format,
-        knobs: {
-          bassDb,
-          midDb,
-          trebleDb,
-          compThreshold,
-          compRatio,
-          stereoWidth,
-          limitLevel,
-        },
+      const knobsPayload = {
+        bassDb,
+        midDb,
+        trebleDb,
+        compThreshold,
+        compRatio,
+        stereoWidth,
+        limitLevel,
       };
+
+      let body: BodyInit;
       // Reference match is optional / sidecar — never block core master
-      if (refMatchEnabled) {
-        body.referenceMatch = true;
-        // Sidecar not wired in MVP; server ignores unless present
+      if (refMatchEnabled && refFile) {
+        const fd = new FormData();
+        fd.append('preset', preset);
+        fd.append('format', format);
+        fd.append('knobs', JSON.stringify(knobsPayload));
+        fd.append('referenceMatch', 'true');
+        fd.append('reference', refFile);
+        body = fd;
+        // Let browser set multipart boundary — do not set Content-Type
+      } else {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify({
+          preset,
+          format,
+          knobs: knobsPayload,
+          referenceMatch: refMatchEnabled ? true : undefined,
+        });
       }
 
       const res = await fetch(`/api/songs/${song.id}/master`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(body),
+        body,
         credentials: 'include',
       });
       const data = (await res.json().catch(() => ({}))) as MasterResponse;
@@ -638,7 +650,7 @@ export const MasterTrackModal: React.FC<MasterTrackModalProps> = ({ isOpen, song
                 <div className="flex items-start gap-1.5 text-[10px] text-amber-500/90">
                   <Info size={12} className="mt-0.5 flex-shrink-0" />
                   <span>
-                    Sidecar not required for mastering. If Matchering is missing, render still succeeds with FFmpeg only.{matcheringStatus ? ` Status:  — ` : ''}
+                    Sidecar not required for mastering. If Matchering is missing, render still succeeds with FFmpeg only.{matcheringStatus ? ` Status: ${matcheringStatus.available ? 'available' : 'unavailable'} (${matcheringStatus.backend}) — ${matcheringStatus.detail}` : ''}
                     {refFile ? ` Reference: ${refFile.name}` : ''}
                   </span>
                 </div>
