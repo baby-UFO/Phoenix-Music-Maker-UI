@@ -16,14 +16,25 @@ export interface AuthenticatedRequest extends Request {
 
 const DEFAULT_USERNAME = process.env.PMM_DEFAULT_USERNAME || process.env.PHOENIX_DEFAULT_USERNAME || 'babyUFO';
 
+/** In-memory cache so /api/auth/auto + authMiddleware never block behind Gradio/sync work. */
+let localUserCache: AuthenticatedUser | null = null;
+let localUserCacheAt = 0;
+const LOCAL_USER_CACHE_MS = 60_000;
+
 /** Resolve-or-create the single local OSS user. Never leaves product APIs without an identity. */
 export async function resolveLocalUser(): Promise<AuthenticatedUser> {
+  const now = Date.now();
+  if (localUserCache && now - localUserCacheAt < LOCAL_USER_CACHE_MS) {
+    return localUserCache;
+  }
   const existing = await pool.query(
     'SELECT id, username, is_admin FROM users ORDER BY created_at ASC LIMIT 1'
   );
   if (existing.rows.length > 0) {
     const u = existing.rows[0];
-    return { id: u.id, username: u.username, isAdmin: Boolean(u.is_admin) };
+    localUserCache = { id: u.id, username: u.username, isAdmin: Boolean(u.is_admin) };
+    localUserCacheAt = now;
+    return localUserCache;
   }
   const userId = generateUUID();
   const username = String(DEFAULT_USERNAME).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50) || 'babyUFO';
@@ -32,7 +43,9 @@ export async function resolveLocalUser(): Promise<AuthenticatedUser> {
      VALUES (?, ?, 1, datetime('now'), datetime('now'))`,
     [userId, username]
   );
-  return { id: userId, username, isAdmin: true };
+  localUserCache = { id: userId, username, isAdmin: true };
+  localUserCacheAt = now;
+  return localUserCache;
 }
 
 export function authMiddleware(

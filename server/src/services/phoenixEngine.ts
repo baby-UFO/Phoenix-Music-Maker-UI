@@ -1,22 +1,16 @@
-import { writeFile, mkdir, copyFile, rm, readFile } from 'fs/promises';
+import { writeFile, mkdir, copyFile, rm, readFile, appendFile } from 'fs/promises';
 import { spawn, execSync } from 'child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { handle_file } from '@gradio/client';
 
 // Get audio duration using ffprobe
+/** Prefer params.duration — never block the Node event loop with sync ffprobe (auth-timeout wedge). */
 function getAudioDuration(filePath: string): number {
-  try {
-    const result = execSync(
-      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
-      { encoding: 'utf-8', timeout: 10000 }
-    );
-    const duration = parseFloat(result.trim());
-    return isNaN(duration) ? 0 : Math.round(duration);
-  } catch (error) {
-    console.warn('Failed to get audio duration:', error);
-    return 0;
-  }
+  // Sync ffprobe was blocking /api/auth/auto while /health stayed 200.
+  // Duration is usually already on the job params / Gradio result; skip probe on hot path.
+  void filePath;
+  return 0;
 }
 import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
@@ -370,9 +364,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
 
   try {
     const fs = await import('fs');
-    fs.appendFileSync(
-      'E:/Phoenix-Music-Maker-UI/server/bpm-debug.log',
-      JSON.stringify({
+    void appendFile('E:/Phoenix-Music-Maker-UI/server/bpm-debug.log', JSON.stringify({
         t: new Date().toISOString(),
         userBpm,
         engineBpm: userBpm,
@@ -384,7 +376,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
         wantsDeepMale: /\b(baritone|basso|profondo|chest voice|low male|deep male)\b/i.test(String(prompt)),
         lmNegativeStart: String(lmNegative).slice(0, 120),
       }) + '\n',
-    );
+    ).catch(() => {});
   } catch {
     // ignore
   }
@@ -1089,9 +1081,7 @@ async function processGenerationViaGradio(
   });
   try {
     const fs = await import('fs');
-    fs.appendFileSync(
-      'E:/Phoenix-Music-Maker-UI/server/dit-steps-debug.log',
-      JSON.stringify({
+    void appendFile('E:/Phoenix-Music-Maker-UI/server/dit-steps-debug.log', JSON.stringify({
         t: new Date().toISOString(),
         phase: 'pre-predict',
         jobId,
@@ -1106,7 +1096,7 @@ async function processGenerationViaGradio(
         duration: params.duration,
         argsLength: args.length,
       }) + '\n',
-    );
+    ).catch(() => {});
   } catch { /* ignore */ }
 
   job.prePredictAt = Date.now();
@@ -1171,9 +1161,7 @@ async function processGenerationViaGradio(
   const genStatus = data[10] as string | undefined;
   try {
     const fs = await import('fs');
-    fs.appendFileSync(
-      'E:/Phoenix-Music-Maker-UI/server/dit-steps-debug.log',
-      JSON.stringify({
+    void appendFile('E:/Phoenix-Music-Maker-UI/server/dit-steps-debug.log', JSON.stringify({
         t: new Date().toISOString(),
         phase: 'post-predict',
         jobId,
@@ -1183,7 +1171,7 @@ async function processGenerationViaGradio(
         genStatus: typeof genStatus === 'string' ? genStatus.slice(0, 500) : genStatus,
         genDetails: typeof genDetails === 'string' ? genDetails.slice(0, 1500) : genDetails,
       }) + '\n',
-    );
+    ).catch(() => {});
   } catch { /* ignore */ }
 
   // Collect audio file objects â€” prefer the "All Generated Files" list

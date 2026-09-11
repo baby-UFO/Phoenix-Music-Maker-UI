@@ -116,7 +116,15 @@ class SqliteClient {
   private inTransaction = false;
 
   async query(sql: string, params?: unknown[]): Promise<QueryResult> {
-    return executeQuery(sql, params, dbInstance);
+    return await new Promise<QueryResult>((resolve, reject) => {
+      setImmediate(() => {
+        try {
+          resolve(executeQuery(sql, params, dbInstance));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
   }
 
   release() {
@@ -135,8 +143,18 @@ class SqliteClient {
 
 // Helper for compatibility with existing code that expects pool-like interface
 export const pool = {
+  // Yield to the event loop so /health and /api/auth/auto can answer while other
+  // request handlers do better-sqlite3 sync work (avoids auth-timeout + health-200 wedge).
   query: async (sql: string, params?: unknown[]): Promise<QueryResult> => {
-    return executeQuery(sql, params);
+    return await new Promise<QueryResult>((resolve, reject) => {
+      setImmediate(() => {
+        try {
+          resolve(executeQuery(sql, params));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
   },
 
   // For transaction support (used by like endpoint)
