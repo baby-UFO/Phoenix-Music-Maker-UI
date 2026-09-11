@@ -28,11 +28,18 @@ const ENGINE_API = config.phoenixEngine.apiUrl;
 // Resolve Phoenix Engine path (from env or default relative path)
 function resolvePhoenixEnginePath(): string {
   const envPath = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH;
+  let resolved: string;
   if (envPath) {
-    return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
+    resolved = path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
+  } else {
+    // Default: sibling Phoenix Engine install folder (sibling of Phoenix-Music-Maker-UI)
+    resolved = path.resolve(__dirname, '../../../Phoenix-Engine');
   }
-  // Default: sibling Phoenix Engine install folder (sibling of Phoenix-Music-Maker-UI)
-  return path.resolve(__dirname, '../../../Phoenix-Engine');
+  // Stale Ace install paths → canonical Phoenix Engine (Gradio checkpoint ids remain acestep-* at boundary)
+  if (/ace-step|ACE-Step/i.test(resolved)) {
+    return 'E:\\Phoenix-Engine';
+  }
+  return resolved;
 }
 
 // Resolve Python path cross-platform (supports venv and portable installations)
@@ -655,8 +662,8 @@ export async function checkSpaceHealth(): Promise<boolean> {
 let lastRequestedDitModel: string | null = null;
 
 const TURBO_STEPS_CAP = 8;
-const PREFERRED_NON_TURBO = 'acestep-v15-sft';
-const FALLBACK_NON_TURBO = 'acestep-v15-base';
+const PREFERRED_NON_TURBO = 'phoenix-v15-sft';
+const FALLBACK_NON_TURBO = 'phoenix-v15-base';
 
 function isTurboDitModel(model?: string | null): boolean {
   return !!model && model.toLowerCase().includes('turbo');
@@ -686,9 +693,9 @@ function isCheckpointOnDisk(model: string): boolean {
 }
 
 function resolveNonTurboDitModel(): string {
-  if (isCheckpointOnDisk(PREFERRED_NON_TURBO)) return PREFERRED_NON_TURBO;
-  if (isCheckpointOnDisk(FALLBACK_NON_TURBO)) return FALLBACK_NON_TURBO;
-  return PREFERRED_NON_TURBO;
+  if (isCheckpointOnDisk(PREFERRED_NON_TURBO)) return toEngineModelId(PREFERRED_NON_TURBO);
+  if (isCheckpointOnDisk(FALLBACK_NON_TURBO)) return toEngineModelId(FALLBACK_NON_TURBO);
+  return toEngineModelId(PREFERRED_NON_TURBO);
 }
 
 /**
@@ -811,17 +818,19 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
   const python = resolvePythonPath(ENGINE_DIR);
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    ACESTEP_CONFIG_PATH: phoenixId,
-    PHOENIX_ENGINE_CONFIG_PATH: phoenixId,
+    ACESTEP_CONFIG_PATH: toEngineModelId(phoenixId),
+    PHOENIX_ENGINE_CONFIG_PATH: toEngineModelId(phoenixId),
     ACESTEP_FORCE_LM_4B: 'true',
     ACESTEP_OFFLOAD_TO_CPU: 'false',
     ACESTEP_OFFLOAD_DIT_TO_CPU: 'false',
   };
-  const tryIds = [phoenixId, toEngineModelId(phoenixId), toPhoenixModelId(phoenixId)];
+  // Ace-era turbo pipeline: boot acestep-* checkpoint folder under Phoenix-Engine (UI ids stay phoenix-*)
+  const tryIds = [toEngineModelId(phoenixId), phoenixId];
   for (const id of tryIds) {
     if (existsSync(path.join(ENGINE_DIR, 'checkpoints', id))) {
-      env.ACESTEP_CONFIG_PATH = id;
-      env.PHOENIX_ENGINE_CONFIG_PATH = id;
+      const engineId = toEngineModelId(id);
+      env.ACESTEP_CONFIG_PATH = engineId;
+      env.PHOENIX_ENGINE_CONFIG_PATH = engineId;
       break;
     }
   }

@@ -159,3 +159,24 @@ export function pickBestPreloadedLm(preloadedNames: string[], fallback: string =
   const first = preloadedNames[0];
   return first ? toPhoenixModelId(first) : fallback;
 }
+
+/** Rewrite Ace model ids inside stored generation_params to phoenix-* (UI-facing). */
+export function migrateGenerationParamsToPhoenix(
+  raw: string | Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (raw == null || raw === '') return null;
+  let obj: Record<string, unknown>;
+  try {
+    obj = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : { ...raw };
+  } catch {
+    return null;
+  }
+  for (const key of ['ditModel', 'lmModel', 'model', 'dit_model', 'lm_model'] as const) {
+    const v = obj[key];
+    if (typeof v === 'string' && v.trim()) {
+      obj[key] = migrateToPhoenixModelId(v);
+    }
+  }
+  return obj;
+}
+
