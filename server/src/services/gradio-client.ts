@@ -5,7 +5,7 @@ let clientInstance: Client | null = null;
 let connectionPromise: Promise<Client> | null = null;
 
 /**
- * Get a lazy-initialized Gradio client connected to the ACE-Step Gradio app.
+ * Get a lazy-initialized Gradio client connected to the Phoenix Engine Gradio app.
  * Caches the connection for reuse across requests.
  */
 export async function getGradioClient(): Promise<Client> {

@@ -669,10 +669,11 @@ async function switchModelIfNeeded(ditModel: string): Promise<void> {
   }
 
   if (!isCheckpointOnDisk(ditModel)) {
-    const hint = `DiT checkpoint '${ditModel}' is not on disk at ${checkpointDirFor(ditModel)}. ` +
-      `Download it (e.g. python -m acestep.model_downloader --model ${ditModel} --skip-main) ` +
-      `and restart Phoenix Engine with --config_path ${ditModel}.`;
-    console.error(`[Model] ${hint}`);
+    const phoenixId = toPhoenixModelId(ditModel);
+    const hint = `Phoenix DiT checkpoint '${phoenixId}' is not on disk. ` +
+      `Download the matching Phoenix Engine checkpoint for ${phoenixId}, ` +
+      `then restart Phoenix Engine with --config_path ${phoenixId}.`;
+    console.error(`[Model] missing engine folder ${checkpointDirFor(ditModel)} (UI id ${phoenixId})`);
     throw new Error(hint);
   }
 
@@ -701,7 +702,7 @@ async function switchModelIfNeeded(ditModel: string): Promise<void> {
     }
 
     const err = await res.text().catch(() => '');
-    throw new Error(`Model switch to '${ditModel}' failed: ${res.status} ${err}`);
+    throw new Error(`Model switch to '${toPhoenixModelId(ditModel)}' failed: ${res.status} ${err}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('404') || /fetch failed|ECONNREFUSED/i.test(msg)) {

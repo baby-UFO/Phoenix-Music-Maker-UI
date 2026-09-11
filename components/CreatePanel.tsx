@@ -286,7 +286,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           parsed.inferenceSteps = expected;
         }
       } catch { /* ignore */ }
-      // Prefer v4 adapter; rewrite missing, non-v4 lora_output/.../final, or Phoenix-Engine. ACE-Step-1.5 v4 is NOT bad.
+      // Prefer v4 adapter; rewrite missing, non-v4 lora_output/.../final, or stale Phoenix-Engine paths. Phoenix Engine v4 adapter path is correct.
       const bad = !parsed.loraPath || /Phoenix-Engine/i.test(parsed.loraPath) || (/lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v4/.test(parsed.loraPath));
       if (bad) parsed.loraPath = 'E:\\ACE-Step-1.5\\lora_output_v4\\final\\adapter';
       return parsed;

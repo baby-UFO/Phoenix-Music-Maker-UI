@@ -73,7 +73,7 @@ function getAudioDuration(filePath: string): number {
   }
 }
 
-// Resolve ACE-Step base directory
+// Resolve Phoenix Engine base directory
 function getPhoenixEngineDir(): string {
   const envPath = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH;
   if (envPath) {
@@ -438,7 +438,7 @@ router.post('/scan-directory', authMiddleware, async (req: AuthenticatedRequest,
       return;
     }
 
-    // Resolve path — if relative, resolve from ACE-Step dir
+    // Resolve path — if relative, resolve from Phoenix Engine dir
     const engineDir = getPhoenixEngineDir();
     const resolvedDir = path.isAbsolute(audioDir)
       ? audioDir

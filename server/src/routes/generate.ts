@@ -445,7 +445,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
     // Start generation
     const { jobId: hfJobId } = await generateMusicViaAPI(params);
 
-    // Update job with ACE-Step task ID
+    // Update job with Phoenix Engine task ID
     await pool.query(
       `UPDATE generation_jobs SET acestep_task_id = ?, status = 'running', updated_at = datetime('now') WHERE id = ?`,
       [hfJobId, localJobId]
@@ -483,7 +483,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
       return;
     }
 
-    // If job is still running, check ACE-Step status
+    // If job is still running, check Phoenix Engine status
     if (['pending', 'queued', 'running'].includes(job.status) && job.acestep_task_id) {
       try {
         const aceStatus = await getJobStatus(job.acestep_task_id);
@@ -600,7 +600,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
         });
         return;
       } catch (aceError) {
-        console.error('ACE-Step status check error:', aceError);
+        console.error('Phoenix Engine status check error:', aceError);
       }
     }
 
@@ -819,7 +819,7 @@ router.get('/models', async (_req, res: Response) => {
       bootModel: bootPhoenix,
       engineConfigPath: bootPhoenix,
       engineConfigPathRaw: engineConfigPath,
-      note: 'DiT checkpoint is selected at engine boot via --config_path. /v1/init hot-swap is not available on this build. Client IDs are phoenix-*; engine folders remain acestep-*.',
+      note: 'DiT checkpoint is selected at engine boot via --config_path. /v1/init hot-swap is not available on this build. Model IDs in the UI are phoenix-*.',
     });
   } catch (error) {
     console.error('Models error:', error);
@@ -842,7 +842,7 @@ router.get('/lm-models', async (_req, res: Response) => {
       lmModels,
       models: lmModels,
       recommended: best,
-      note: 'LM ids are phoenix-*; engine folders remain acestep-*. is_preloaded requires model.safetensors or a complete sharded safetensors set.',
+      note: 'LM ids in the UI are phoenix-*. is_preloaded requires model.safetensors or a complete sharded safetensors set.',
     });
   } catch (error) {
     console.error('LM models error:', error);
@@ -963,7 +963,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
     if (keyScale) paramObj.key = keyScale;
     if (timeSignature) paramObj.time_signature = timeSignature;
 
-    // Primary path: call ACE-Step's /format_input REST endpoint (avoids Python spawn ENOENT on Windows)
+    // Primary path: call Phoenix Engine /format_input REST endpoint (avoids Python spawn ENOENT on Windows)
     try {
       console.log(`[Format] Calling REST API: ${PHOENIX_ENGINE_API_URL}/format_input`);
       const apiRes = await fetch(`${PHOENIX_ENGINE_API_URL}/format_input`, {
