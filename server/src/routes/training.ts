@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+﻿import { Router, Request, Response } from 'express';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getGradioClient } from '../services/gradio-client.js';
 import { config } from '../config/index.js';
@@ -88,7 +88,7 @@ function getPhoenixEngineDir(): string {
 
 // ================== NEW ROUTES ==================
 
-// POST /api/training/upload-audio — Upload audio files for a dataset
+// POST /api/training/upload-audio â€” Upload audio files for a dataset
 router.post('/upload-audio', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   const datasetName = safeDatasetName(req.query.datasetName || req.body?.datasetName);
   const uploadDir = path.join(config.datasets.uploadsDir, datasetName);
@@ -166,7 +166,7 @@ router.post('/upload-audio', authMiddleware, (req: AuthenticatedRequest, res: Re
   req.pipe(bb);
 });
 
-// POST /api/training/build-dataset — Scan audio directory + create dataset JSON
+// POST /api/training/build-dataset â€” Scan audio directory + create dataset JSON
 router.post('/build-dataset', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
@@ -293,7 +293,7 @@ router.post('/build-dataset', authMiddleware, async (req: AuthenticatedRequest, 
   }
 });
 
-// GET /api/training/audio — Proxy audio files from datasets directory
+// GET /api/training/audio â€” Proxy audio files from datasets directory
 router.get('/audio', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     let filePath: string;
@@ -339,7 +339,7 @@ router.get('/audio', authMiddleware, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
-// POST /api/training/preprocess — Spawn Python preprocessing script
+// POST /api/training/preprocess â€” Spawn Python preprocessing script
 router.post('/preprocess', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { datasetPath, outputDir } = req.body;
@@ -422,7 +422,7 @@ router.post('/preprocess', authMiddleware, async (req: AuthenticatedRequest, res
   }
 });
 
-// POST /api/training/scan-directory — Scan a directory for audio files (Node.js implementation)
+// POST /api/training/scan-directory â€” Scan a directory for audio files (Node.js implementation)
 router.post('/scan-directory', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
@@ -438,7 +438,7 @@ router.post('/scan-directory', authMiddleware, async (req: AuthenticatedRequest,
       return;
     }
 
-    // Resolve path — if relative, resolve from Phoenix Engine dir
+    // Resolve path â€” if relative, resolve from Phoenix Engine dir
     const engineDir = getPhoenixEngineDir();
     const resolvedDir = path.isAbsolute(audioDir)
       ? audioDir
@@ -473,7 +473,7 @@ router.post('/scan-directory', authMiddleware, async (req: AuthenticatedRequest,
         } catch { /* ignore */ }
       }
 
-      return [i + 1, filename, `${duration}s`, lyrics, '❌', '', '', ''];
+      return [i + 1, filename, `${duration}s`, lyrics, 'âŒ', '', '', ''];
     });
 
     res.json({
@@ -491,7 +491,7 @@ router.post('/scan-directory', authMiddleware, async (req: AuthenticatedRequest,
   }
 });
 
-// POST /api/training/auto-label — Auto-label dataset samples
+// POST /api/training/auto-label â€” Auto-label dataset samples
 // NOTE: Auto-labeling requires the DIT model + LLM to be loaded in Gradio.
 // This endpoint attempts to call the Gradio handler. If the Gradio app does not
 // expose auto_label_all as a named API, this will fail and the user should use
@@ -521,7 +521,7 @@ router.post('/auto-label', authMiddleware, async (req: AuthenticatedRequest, res
         status: data[1],
       });
     } catch (gradioError) {
-      // Lambda endpoints aren't named — suggest using Gradio UI
+      // Lambda endpoints aren't named â€” suggest using Gradio UI
       res.status(501).json({
         error: 'Auto-labeling requires the Gradio UI. The model must be initialized and the dataset loaded in the Gradio training tab.',
         hint: 'Use the Gradio UI at the Phoenix Engine server URL to auto-label your dataset, then reload it here.',
@@ -533,7 +533,7 @@ router.post('/auto-label', authMiddleware, async (req: AuthenticatedRequest, res
   }
 });
 
-// POST /api/training/init-model — Initialize or change model for training
+// POST /api/training/init-model â€” Initialize or change model for training
 // NOTE: Model initialization requires the Gradio app. This endpoint attempts to
 // call the init_service_wrapper. Since it's a lambda, this may not be accessible.
 router.post('/init-model', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
@@ -554,7 +554,7 @@ router.post('/init-model', authMiddleware, async (req: AuthenticatedRequest, res
 
     const client = await getGradioClient();
     try {
-      // Boundary: Phoenix UI ids → engine acestep-* folders for Gradio
+      // Boundary: Phoenix UI ids â†’ engine acestep-* folders for Gradio
       const engineCheckpoint = checkpoint ? toEngineModelId(checkpoint) : '';
       const engineConfigPath = configPath ? toEngineModelId(configPath) : '';
       const engineLmPath = lmModelPath ? toEngineModelId(lmModelPath) : '';
@@ -578,7 +578,7 @@ router.post('/init-model', authMiddleware, async (req: AuthenticatedRequest, res
         modelReady: !!data[1],
       });
     } catch (gradioError) {
-      // Lambda endpoints aren't named — suggest using Gradio UI
+      // Lambda endpoints aren't named â€” suggest using Gradio UI
       res.status(501).json({
         error: 'Model initialization requires the Gradio UI.',
         hint: 'Initialize the model in the Phoenix Engine Gradio UI service configuration section, then return here for training.',
@@ -590,7 +590,7 @@ router.post('/init-model', authMiddleware, async (req: AuthenticatedRequest, res
   }
 });
 
-// GET /api/training/checkpoints — List available model checkpoints
+// GET /api/training/checkpoints â€” List available model checkpoints
 router.get('/checkpoints', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const engineDir = getPhoenixEngineDir();
@@ -631,7 +631,7 @@ router.get('/checkpoints', authMiddleware, async (_req: AuthenticatedRequest, re
   }
 });
 
-// GET /api/training/lora-checkpoints — List LoRA training checkpoints in output dir
+// GET /api/training/lora-checkpoints â€” List LoRA training checkpoints in output dir
 router.get('/lora-checkpoints', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const outputDir = (req.query.dir as string) || './lora_output';
@@ -673,7 +673,7 @@ router.get('/lora-checkpoints', authMiddleware, async (req: AuthenticatedRequest
 
 // ================== EXISTING ROUTES ==================
 
-// POST /api/training/load-dataset — Load an existing dataset JSON for preprocessing
+// POST /api/training/load-dataset â€” Load an existing dataset JSON for preprocessing
 router.post('/load-dataset', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { datasetPath } = req.body;
@@ -728,7 +728,7 @@ router.post('/load-dataset', authMiddleware, async (req: AuthenticatedRequest, r
   }
 });
 
-// GET /api/training/sample-preview — Get preview data for a specific sample
+// GET /api/training/sample-preview â€” Get preview data for a specific sample
 router.get('/sample-preview', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const idx = parseInt(req.query.idx as string) || 0;
@@ -759,7 +759,7 @@ router.get('/sample-preview', authMiddleware, async (req: AuthenticatedRequest, 
   }
 });
 
-// POST /api/training/save-sample — Save edits to a dataset sample
+// POST /api/training/save-sample â€” Save edits to a dataset sample
 router.post('/save-sample', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { sampleIdx, caption, genre, promptOverride, lyrics, bpm, key, timeSignature, language, instrumental } = req.body;
@@ -790,18 +790,18 @@ router.post('/save-sample', authMiddleware, async (req: AuthenticatedRequest, re
   }
 });
 
-// POST /api/training/update-settings — Update dataset global settings
+// POST /api/training/update-settings â€” Update dataset global settings
 // Settings are applied directly when saving (via REST API), so no Gradio call needed here.
 router.post('/update-settings', authMiddleware, (_req: AuthenticatedRequest, res: Response) => {
   res.json({ success: true });
 });
 
-// POST /api/training/save-dataset — Save the dataset to a JSON file
+// POST /api/training/save-dataset â€” Save the dataset to a JSON file
 router.post('/save-dataset', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { savePath, datasetName, customTag, tagPosition, allInstrumental, genreRatio } = req.body;
     const name = (datasetName ?? 'my_lora_dataset').toString().trim() || 'my_lora_dataset';
-    const engineRoot = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || 'E:\\ACE-Step-1.5';
+    const engineRoot = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || 'E:\\Phoenix-Engine';
     const requested = (savePath ?? `./datasets/${name}.json`).toString().trim();
     const dest = path.isAbsolute(requested)
       ? requested
@@ -844,7 +844,7 @@ router.post('/save-dataset', authMiddleware, async (req: AuthenticatedRequest, r
   }
 });
 
-// POST /api/training/load-tensors — Load preprocessed tensors for training
+// POST /api/training/load-tensors â€” Load preprocessed tensors for training
 router.post('/load-tensors', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { tensorDir } = req.body;
@@ -862,7 +862,7 @@ router.post('/load-tensors', authMiddleware, async (req: AuthenticatedRequest, r
   }
 });
 
-// POST /api/training/start — Start LoRA training and return immediately
+// POST /api/training/start â€” Start LoRA training and return immediately
 router.post('/start', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
@@ -871,7 +871,7 @@ router.post('/start', authMiddleware, async (req: AuthenticatedRequest, res: Res
       seed, outputDir,
     } = req.body ?? {};
 
-    const engineDir = config.phoenixEngine?.path || 'E:\\ACE-Step-1.5';
+    const engineDir = config.phoenixEngine?.path || 'E:\\Phoenix-Engine';
     const resolveOut = (value: unknown, fallback: string) => {
       const raw = typeof value === 'string' && value.trim() ? value.trim() : fallback;
       return path.isAbsolute(raw) ? raw : path.resolve(engineDir, raw.replace(/^\.[\\/]/, ''));
@@ -912,7 +912,7 @@ router.post('/start', authMiddleware, async (req: AuthenticatedRequest, res: Res
   }
 });
 
-// POST /api/training/stop — Stop current training
+// POST /api/training/stop â€” Stop current training
 router.post('/stop', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const client = await getGradioClient();
@@ -926,7 +926,7 @@ router.post('/stop', authMiddleware, async (_req: AuthenticatedRequest, res: Res
   }
 });
 
-// POST /api/training/export — Export trained LoRA weights
+// POST /api/training/export â€” Export trained LoRA weights
 router.post('/export', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { exportPath, loraOutputDir } = req.body;
@@ -945,7 +945,7 @@ router.post('/export', authMiddleware, async (req: AuthenticatedRequest, res: Re
   }
 });
 
-// POST /api/training/import-dataset — Import train/test split
+// POST /api/training/import-dataset â€” Import train/test split
 router.post('/import-dataset', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { datasetType } = req.body;

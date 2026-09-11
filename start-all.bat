@@ -1,5 +1,5 @@
 @echo off
-title Phoenix Music Maker
+title Phoenix Music Maker UI
 REM Phoenix Music Maker Complete Startup Script for Windows
 REM Starts Phoenix Engine + Backend + Frontend
 setlocal EnableDelayedExpansion
@@ -24,36 +24,24 @@ if not exist "server\node_modules" (
     exit /b 1
 )
 
-REM Get Phoenix Engine path from environment or use default
+REM Resolve Phoenix Engine path (never use ace-step / ACE-Step-1.5)
 if not "%PHOENIX_ENGINE_PATH%"=="" (
     set ACESTEP_PATH=%PHOENIX_ENGINE_PATH%
 )
-
-if "%ACESTEP_PATH%"=="" (
-    if exist "..\Phoenix-Engine\" (
-        set ACESTEP_PATH=..\Phoenix-Engine
-    ) else if exist "E:\Phoenix-Engine\" (
-        set ACESTEP_PATH=E:\Phoenix-Engine
-    ) else (
-        set ACESTEP_PATH=..\ACE-Step-1.5
-    )
-)
-
-REM Check if Phoenix Engine exists
-if not exist "%ACESTEP_PATH%" (
-    echo.
-    echo Warning: Phoenix Engine not found at %ACESTEP_PATH%
-    echo.
-    echo Please set PHOENIX_ENGINE_PATH or place Phoenix-Engine next to Phoenix-Music-Maker-UI
-    echo Example: set PHOENIX_ENGINE_PATH=E:\Phoenix-Engine
-    echo.
+REM Override empty, missing, or legacy ace-step paths
+if "%ACESTEP_PATH%"=="" set ACESTEP_PATH=E:\Phoenix-Engine
+echo %ACESTEP_PATH% | findstr /I /C:"ace-step" /C:"ACE-Step" >nul && set ACESTEP_PATH=E:\Phoenix-Engine
+if not exist "%ACESTEP_PATH%\python_embeded\python.exe" if not exist "%ACESTEP_PATH%" set ACESTEP_PATH=E:\Phoenix-Engine
+if not exist "E:\Phoenix-Engine\" (
+    echo Error: Phoenix Engine not found at E:\Phoenix-Engine
     pause
     exit /b 1
 )
-
+if not exist "%ACESTEP_PATH%" set ACESTEP_PATH=E:\Phoenix-Engine
+echo [+] Phoenix Engine path: %ACESTEP_PATH%
 REM Prefer non-turbo DiT so inference steps >8 are not clamped to 8 by turbo.
 REM Must set BEFORE the ( ) block ? cmd expands %VAR% at parse time inside blocks.
-REM Prefer Phoenix junction name when present; else legacy acestep-* folder.
+REM Prefer Phoenix checkpoint names when present.
 REM Full Monty for babyUFO: prefer XL SFT DiT + LM 4B, NEVER turbo. RTX 4080 16GB needs CPU offload.
 if "%ACESTEP_CONFIG_PATH%"=="" (
     if exist "%ACESTEP_PATH%\checkpoints\phoenix-v15-xl-sft\model.safetensors.index.json" (
@@ -109,7 +97,7 @@ echo.
 
 REM Start Phoenix Engine API in new window
 echo [1/3] Starting Phoenix Engine API server...
-start "Phoenix Engine API" cmd /k "cd /d "%ACESTEP_PATH%" && set ACESTEP_CONFIG_PATH=!ACESTEP_CONFIG_PATH! && set ACESTEP_FORCE_LM_4B=!ACESTEP_FORCE_LM_4B! && set ACESTEP_LM_MODEL_PATH=!ACESTEP_LM_MODEL_PATH! && !API_COMMAND!"
+start "Phoenix Engine" cmd /k "cd /d !ACESTEP_PATH! && set ACESTEP_CONFIG_PATH=!ACESTEP_CONFIG_PATH! && set ACESTEP_FORCE_LM_4B=!ACESTEP_FORCE_LM_4B! && set ACESTEP_LM_MODEL_PATH=!ACESTEP_LM_MODEL_PATH! && !API_COMMAND!"
 
 REM Wait for API to start
 echo Waiting for API to initialize...
@@ -117,7 +105,7 @@ timeout /t 5 /nobreak >nul
 
 REM Start backend in new window
 echo [2/3] Starting backend server...
-start "Phoenix Music Maker UI Backend" cmd /k "cd /d "%~dp0server" && npm run dev"
+start "Phoenix Music Maker UI Backend" cmd /k "cd /d %~dp0server && npm run dev"
 
 REM Wait for backend to start
 echo Waiting for backend to start...
@@ -125,7 +113,7 @@ timeout /t 3 /nobreak >nul
 
 REM Start frontend in new window
 echo [3/3] Starting frontend...
-start "Phoenix Music Maker UI" cmd /k "cd /d "%~dp0" && npm run dev"
+start "Phoenix Music Maker UI" cmd /k "cd /d %~dp0 && npm run dev"
 
 REM Wait a moment
 timeout /t 2 /nobreak >nul

@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import multer from 'multer';
 import { existsSync, statSync, readFileSync } from 'fs';
 import path from 'path';
@@ -86,7 +86,7 @@ function autoTitle(params: { title?: string; lyrics?: string; instrumental?: boo
     for (const line of params.lyrics.split('\n')) {
       const t = line.trim();
       if (t && !/^\[.*\]$/.test(t)) {
-        base = t.length > 32 ? t.slice(0, 32).trimEnd() + '…' : t;
+        base = t.length > 32 ? t.slice(0, 32).trimEnd() + 'â€¦' : t;
         break;
       }
     }
@@ -103,14 +103,14 @@ function autoTitle(params: { title?: string; lyrics?: string; instrumental?: boo
 
   if (!base) base = 'Track';
   // Always stamp so successive gens with the same prompt are distinguishable
-  return `${base} · ${stamp()}`;
+  return `${base} Â· ${stamp()}`;
 }
 
 
 async function allocateVersionedSongTitles(userId: string, requestedTitle: string, count: number): Promise<string[]> {
   const raw = (requestedTitle || '').trim();
   if (!raw) {
-    return Array.from({ length: count }, (_, i) => `Track · ${stamp()}${count > 1 ? `-${i + 1}` : ''}`);
+    return Array.from({ length: count }, (_, i) => `Track Â· ${stamp()}${count > 1 ? `-${i + 1}` : ''}`);
   }
 
   // Client may already send "Name-3". Trust that stem/number and continue the sequence for batches.
@@ -698,7 +698,7 @@ router.get('/endpoints', authMiddleware, async (_req: AuthenticatedRequest, res:
 
 router.get('/models', async (_req, res: Response) => {
   try {
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
     const checkpointsDir = path.join(PHOENIX_ENGINE_DIR, 'checkpoints');
 
     // All known DiT models from Gradio's model_downloader.py registry:
@@ -828,10 +828,10 @@ router.get('/models', async (_req, res: Response) => {
 });
 
 
-// GET /api/generate/lm-models — 5Hz LM checkpoints with disk preload truth
+// GET /api/generate/lm-models â€” 5Hz LM checkpoints with disk preload truth
 router.get('/lm-models', async (_req, res: Response) => {
   try {
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
     const checkpointsDir = path.join(PHOENIX_ENGINE_DIR, 'checkpoints');
     const lmModels = listLmModelsFromDisk(checkpointsDir);
     const preferred = ['phoenix-5Hz-lm-4B', 'phoenix-5Hz-lm-1.7B', 'phoenix-5Hz-lm-0.6B'];
@@ -850,7 +850,7 @@ router.get('/lm-models', async (_req, res: Response) => {
   }
 });
 
-// GET /api/generate/random-description — Load a random simple description from Gradio
+// GET /api/generate/random-description â€” Load a random simple description from Gradio
 router.get('/random-description', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const client = await getGradioClient();
@@ -880,7 +880,7 @@ router.get('/health', async (_req, res: Response) => {
 router.get('/limits', async (_req, res: Response) => {
   try {
     const { spawn } = await import('child_process');
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
@@ -975,7 +975,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
           temperature: temperature ?? 0.85,
           param_obj: paramObj,
         }),
-        signal: AbortSignal.timeout(300_000), // 5 min — LLM may need to init first
+        signal: AbortSignal.timeout(300_000), // 5 min â€” LLM may need to init first
       });
 
       const apiData = await apiRes.json() as any;
@@ -1011,7 +1011,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
     // Fallback: Python spawn (only reached when REST API is unreachable)
     const { spawn } = await import('child_process');
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const SCRIPTS_DIR = path.join(__dirname, '../../scripts');

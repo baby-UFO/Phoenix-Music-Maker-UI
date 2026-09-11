@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Loader2 } from 'lucide-react';
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -238,7 +238,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     lmBatchChunkSize: 8,
     isFormatCaption: false,
     showLoraPanel: true,
-    loraPath: 'E:\ACE-Step-1.5\lora_output_v4\final\adapter',
+    loraPath: 'E:\\Phoenix-Engine\\lora_output_v4\\final\\adapter',
     loraEnabled: true,
     loraScale: 1.0,
   };
@@ -286,9 +286,9 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           parsed.inferenceSteps = expected;
         }
       } catch { /* ignore */ }
-      // Prefer v4 adapter; rewrite missing, non-v4 lora_output/.../final, or stale Phoenix-Engine paths. Phoenix Engine v4 adapter path is correct.
-      const bad = !parsed.loraPath || /Phoenix-Engine/i.test(parsed.loraPath) || (/lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v4/.test(parsed.loraPath));
-      if (bad) parsed.loraPath = 'E:\\ACE-Step-1.5\\lora_output_v4\\final\\adapter';
+      // Prefer v4 adapter; rewrite missing, non-v4 lora_output/.../final, or stale ACE-Step paths to Phoenix-Engine.
+      const bad = !parsed.loraPath || /ACE-Step/i.test(parsed.loraPath) || /ace-step/i.test(parsed.loraPath) || (/lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v4/.test(parsed.loraPath));
+      if (bad) parsed.loraPath = 'E:\\Phoenix-Engine\\lora_output_v4\\final\\adapter';
       return parsed;
     } catch {
       return { ...BUILTIN_CREATE_DEFAULTS };
@@ -521,7 +521,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
   // LoRA Parameters
   const [showLoraPanel, setShowLoraPanel] = useState(cs('showLoraPanel', true));
-  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\ACE-Step-1.5\lora_output_v4\final\adapter'));
+  const [loraPath, setLoraPath] = useState(cs('loraPath', 'E:\\Phoenix-Engine\\lora_output_v4\\final\\adapter'));
   const [loraLoaded, setLoraLoaded] = useState(false);
   const [loraEnabled, setLoraEnabled] = useState(cs('loraEnabled', true));
   const [loraScale, setLoraScale] = useState(cs('loraScale', 1.0));
@@ -590,7 +590,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     const bestMax = preloadedDit.includes('phoenix-v15-xl-sft')
       ? 'phoenix-v15-xl-sft'
       : pickBestPreloadedDit(preloadedDit, DEFAULT_PHOENIX_DIT_MODEL);
-    const bestQuality = bestMax; // same DiT family — steps differ
+    const bestQuality = bestMax; // same DiT family â€” steps differ
     const bestFast =
       preloadedDit.includes('phoenix-v15-base') ? 'phoenix-v15-base'
       : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-base');
@@ -598,7 +598,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     const preloadedLm = fetchedLmModels.filter((m) => m.is_preloaded).map((m) => toPhoenixModelId(m.name));
     const bestLm = pickBestPreloadedLm(preloadedLm, DEFAULT_PHOENIX_LM_MODEL);
 
-    // NEVER turbo for babyUFO — full quality stack only
+    // NEVER turbo for babyUFO â€” full quality stack only
     if (preset === 'fast') {
       persistModel(bestFast);
       setInferenceSteps(50);
@@ -1585,7 +1585,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         ? (isRap ? maleRapHint : maleNonRapHint)
         : 'female vocals';
       // Don't stack a weak "Male vocals" if the style already describes the voice.
-      // Still forceRapDelivery when hasVocalDetail — user JEJ text may contain toxic speaking/oratorical cues.
+      // Still forceRapDelivery when hasVocalDetail â€” user JEJ text may contain toxic speaking/oratorical cues.
       if (hasVocalDetail) return forceRapDelivery(promoteVocalFront(trimmed));
       return forceRapDelivery(promoteVocalFront(trimmed ? `${genderHint}, ${trimmed}` : genderHint));
     })();
@@ -1603,7 +1603,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       const other = parts.filter((p) => !vocalRe.test(p));
       // Drop redundant bare "Male vocals" / "Female vocals" if richer vocal phrases exist
       let rich = vocal.filter((p) => !/^(male|female)\s+vocals?$/i.test(p));
-      // JEJ target is basso profondo (~85-95 Hz). Plain "baritone" pulls ~110-140 Hz — strip it when deep-bass cues exist.
+      // JEJ target is basso profondo (~85-95 Hz). Plain "baritone" pulls ~110-140 Hz â€” strip it when deep-bass cues exist.
       const hasDeepBass = rich.some((p) => /\b(basso|profondo|bass voice|bass vocals?|james earl jones|jej-depth)\b/i.test(p));
       if (hasDeepBass) {
         rich = rich.filter((p) => !/\bbaritone\b/i.test(p));
@@ -1853,7 +1853,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                             </span>
                             {fetchedModels.find(m => m.name === model.id)?.is_preloaded && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                {fetchedModels.find(m => m.name === model.id)?.is_active ? 'Ã¢â€”Â Active' : 'Ã¢â€”Â Ready'}
+                                {fetchedModels.find(m => m.name === model.id)?.is_active ? 'ÃƒÂ¢Ã¢â‚¬â€Ã‚Â Active' : 'ÃƒÂ¢Ã¢â‚¬â€Ã‚Â Ready'}
                               </span>
                             )}
                           </div>
@@ -2379,7 +2379,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 {engineBootModel && (
                   <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-snug">
                     Engine boot model: <span className="font-semibold">{getPhoenixModelLabel(engineBootModel)}</span>
-                    {" — "}DiT checkpoint is fixed at engine start (no live hot-swap). Fast/turbo needs a turbo boot; Quality/Max use base/sft with high steps on the current engine.
+                    {" â€” "}DiT checkpoint is fixed at engine start (no live hot-swap). Fast/turbo needs a turbo boot; Quality/Max use base/sft with high steps on the current engine.
                   </p>
                 )}
                 {!engineBootModel && (
@@ -2697,7 +2697,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               <p className="text-[10px] text-zinc-500">{t('queueMultipleJobs')}</p>
             </div>
 
-            {/* Inference Steps — max/step follow qualityPreset (or turbo cap); EditableSlider still allows typed values */}
+            {/* Inference Steps â€” max/step follow qualityPreset (or turbo cap); EditableSlider still allows typed values */}
             {(() => {
               const turbo = isTurboModel(selectedModel);
               const stepsMax = turbo
@@ -2971,7 +2971,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 <button
                   type="button"
                   onClick={() => {
-                    // Convert source audio to LM codes Ã¢â‚¬â€ requires Gradio lambda (not exposed as API)
+                    // Convert source audio to LM codes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â requires Gradio lambda (not exposed as API)
                     // This is a placeholder: Gradio's convert_src_audio_to_codes_wrapper is not a named endpoint
                     console.log('Convert to Codes: requires source audio upload. Use Gradio UI for this feature.');
                   }}
@@ -2984,7 +2984,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                 <button
                   type="button"
                   onClick={() => {
-                    // Transcribe audio codes to metadata Ã¢â‚¬â€ requires Gradio lambda (not exposed as API)
+                    // Transcribe audio codes to metadata ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â requires Gradio lambda (not exposed as API)
                     console.log('Transcribe: requires audio codes. Use Gradio UI for this feature.');
                   }}
                   disabled={!audioCodes.trim()}

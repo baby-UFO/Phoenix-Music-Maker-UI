@@ -1,4 +1,4 @@
-import { writeFile, mkdir, copyFile, rm, readFile } from 'fs/promises';
+﻿import { writeFile, mkdir, copyFile, rm, readFile } from 'fs/promises';
 import { spawn, execSync } from 'child_process';
 import { existsSync, readdirSync } from 'fs';
 import path from 'path';
@@ -35,8 +35,8 @@ function resolvePhoenixEnginePath(): string {
   if (envPath) {
     return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
   }
-  // Default: sibling Phoenix Engine install folder (also reachable via legacy ACE-Step-1.5 folder)
-  return path.resolve(__dirname, '../../../ACE-Step-1.5');
+  // Default: sibling Phoenix Engine install folder (sibling of Phoenix-Music-Maker-UI)
+  return path.resolve(__dirname, '../../../Phoenix-Engine');
 }
 
 // Resolve Python path cross-platform (supports venv and portable installations)
@@ -224,7 +224,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     const otherParts = parts.filter((p) => !TIMBRE_RE.test(p));
     const seen = new Set<string>();
     const ordered: string[] = [];
-    // Timbre (JEJ/basso) before long RAP delivery list — depth was getting ignored when buried last
+    // Timbre (JEJ/basso) before long RAP delivery list â€” depth was getting ignored when buried last
     for (const p of [...timbreParts, ...rapLead, ...otherParts]) {
       const k = p.toLowerCase();
       if (seen.has(k)) continue;
@@ -235,7 +235,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   }
 
   // Force deep-basso depth wording when user asked for deep male / baritone / basso
-  // For rap: soft JEJ-depth pitch cue AFTER rap lead — never celebrity-actor / speaking-F0 lead.
+  // For rap: soft JEJ-depth pitch cue AFTER rap lead â€” never celebrity-actor / speaking-F0 lead.
   const wantsJeJDepth = /\b(baritone|basso|profondo|james earl jones|jej-depth|chest voice|low male|deep male|oratorical)\b/i.test(prompt);
   if (wantsJeJDepth && !/jej-depth|james earl jones/i.test(prompt)) {
     const jejLead = wantsRap
@@ -243,7 +243,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
       : 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature deep male timbre, rumbling low register, no tenor';
     prompt = wantsRap ? `${prompt}, ${jejLead}` : `${jejLead}, ${prompt}`;
   } else if (wantsRap && wantsJeJDepth) {
-    // Already has JEJ/depth wording — ensure rap lead is still first (promote may have run before rewrite)
+    // Already has JEJ/depth wording â€” ensure rap lead is still first (promote may have run before rewrite)
     prompt = promoteVocals(prompt);
   }
 
@@ -284,7 +284,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     prompt = `${trigger}${prompt}`.replace(/,\s*,+/g, ', ').replace(/^,\s*/, '').trim();
   }
 
-  // Hard pitch-lock for JEJ/basso asks — model otherwise parks ~130 Hz light baritone.
+  // Hard pitch-lock for JEJ/basso asks â€” model otherwise parks ~130 Hz light baritone.
   if (/\b(james earl jones|jej-depth|basso|profondo|85-95\s*Hz|~90\s*Hz)\b/i.test(prompt)) {
     const pitchLock = 'James Earl Jones basso profondo, vocal fundamental ~90 Hz (F#2), stay below 100 Hz chest, one octave deeper than typical male rap, rumbling 85 Hz drone voice';
     if (!/vocal fundamental ~90 Hz/i.test(prompt)) {
@@ -307,7 +307,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   }
 
   const wantCotMetas = (isEnhance || isThinking) ? (params.useCotMetas ?? true) : (params.useCotMetas ?? false);
-  // Don't rewrite the user's caption when BPM is set — that was scrambling tempo cues
+  // Don't rewrite the user's caption when BPM is set â€” that was scrambling tempo cues
   const wantCotCaption = userBpm > 0 ? false : (isEnhance || isThinking) ? (params.useCotCaption ?? true) : false;
   const wantCotLanguage = (isEnhance || isThinking) ? (params.useCotLanguage ?? true) : false;
 
@@ -335,7 +335,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   try {
     const fs = await import('fs');
     fs.appendFileSync(
-      'E:/ace-step/server/bpm-debug.log',
+      'E:/Phoenix-Music-Maker-UI/server/bpm-debug.log',
       JSON.stringify({
         t: new Date().toISOString(),
         userBpm,
@@ -578,7 +578,7 @@ export async function checkSpaceHealth(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Model switching — call /v1/init to change the active DiT model
+// Model switching â€” call /v1/init to change the active DiT model
 // ---------------------------------------------------------------------------
 
 /** Last DiT model we successfully targeted (engine /v1/models often returns "unknown"). */
@@ -622,8 +622,8 @@ function resolveNonTurboDitModel(): string {
 }
 
 /**
- * If turbo + high steps, force a non-turbo DiT so engine turbo clamp (infer_steps>8→8) does not apply.
- * Mutates params in place. Does NOT remove the engine clamp — wrong architecture.
+ * If turbo + high steps, force a non-turbo DiT so engine turbo clamp (infer_steps>8â†’8) does not apply.
+ * Mutates params in place. Does NOT remove the engine clamp â€” wrong architecture.
  */
 function enforceNonTurboForHighSteps(params: GenerationParams): void {
   if (params.ditModel) params.ditModel = toEngineModelId(params.ditModel);
@@ -634,14 +634,14 @@ function enforceNonTurboForHighSteps(params: GenerationParams): void {
   const target = resolveNonTurboDitModel();
   if (isTurboDitModel(params.ditModel) || !params.ditModel) {
     console.log(
-      `[Model] inferenceSteps=${steps} with turbo/missing ditModel '${params.ditModel ?? '(none)'}' → forcing '${target}'`,
+      `[Model] inferenceSteps=${steps} with turbo/missing ditModel '${params.ditModel ?? '(none)'}' â†’ forcing '${target}'`,
     );
     params.ditModel = target;
   }
 }
 
 async function getActiveModel(): Promise<string | null> {
-  // Prefer our last successful request — Gradio /v1/models often returns name "unknown"
+  // Prefer our last successful request â€” Gradio /v1/models often returns name "unknown"
   if (lastRequestedDitModel) return lastRequestedDitModel;
   try {
     const res = await fetch(`${ENGINE_API}/v1/models`);
@@ -658,7 +658,7 @@ async function getActiveModel(): Promise<string | null> {
 
 /**
  * Attempt to switch DiT via /v1/init when available.
- * This Gradio build often 404s /v1/init — do NOT hard-fail; boot config_path must match.
+ * This Gradio build often 404s /v1/init â€” do NOT hard-fail; boot config_path must match.
  */
 async function switchModelIfNeeded(ditModel: string): Promise<void> {
   ditModel = toEngineModelId(ditModel);
@@ -719,7 +719,7 @@ export async function discoverEndpoints(): Promise<unknown> {
   return { provider: 'phoenix-engine-gradio', endpoint: ENGINE_API };
 }
 
-// Reset client — forces Gradio reconnection on next request
+// Reset client â€” forces Gradio reconnection on next request
 export function resetClient(): void {
   resetGradioClient();
 }
@@ -782,7 +782,7 @@ export async function generateMusicViaAPI(params: GenerationParams): Promise<{ j
 }
 
 // ---------------------------------------------------------------------------
-// processGeneration — Gradio primary, Python spawn fallback
+// processGeneration â€” Gradio primary, Python spawn fallback
 // ---------------------------------------------------------------------------
 
 async function processGeneration(
@@ -793,9 +793,9 @@ async function processGeneration(
   job.status = 'running';
   job.stage = 'Starting generation...';
 
-  // Server-side safety: turbo + steps>8 → force non-turbo DiT (engine still has its own clamp)
+  // Server-side safety: turbo + steps>8 â†’ force non-turbo DiT (engine still has its own clamp)
   enforceNonTurboForHighSteps(params);
-  // Boundary: translate Phoenix IDs → engine acestep-* before Gradio/python
+  // Boundary: translate Phoenix IDs â†’ engine acestep-* before Gradio/python
   if (params.ditModel) params.ditModel = toEngineModelId(params.ditModel);
   if (params.lmModel) params.lmModel = toEngineModelId(params.lmModel);
 
@@ -857,7 +857,7 @@ async function processGenerationViaGradio(
   try {
     const fs = await import('fs');
     fs.appendFileSync(
-      'E:/ace-step/server/dit-steps-debug.log',
+      'E:/Phoenix-Music-Maker-UI/server/dit-steps-debug.log',
       JSON.stringify({
         t: new Date().toISOString(),
         phase: 'pre-predict',
@@ -896,7 +896,7 @@ async function processGenerationViaGradio(
   try {
     const fs = await import('fs');
     fs.appendFileSync(
-      'E:/ace-step/server/dit-steps-debug.log',
+      'E:/Phoenix-Music-Maker-UI/server/dit-steps-debug.log',
       JSON.stringify({
         t: new Date().toISOString(),
         phase: 'post-predict',
@@ -910,7 +910,7 @@ async function processGenerationViaGradio(
     );
   } catch { /* ignore */ }
 
-  // Collect audio file objects — prefer the "All Generated Files" list
+  // Collect audio file objects â€” prefer the "All Generated Files" list
   let audioFileObjects: Array<{ url?: string; path?: string; orig_name?: string }> = [];
 
   if (Array.isArray(allFiles) && allFiles.length > 0) {
@@ -1211,7 +1211,7 @@ function runPythonGeneration(scriptArgs: string[], timeoutMs = 600000): Promise<
 }
 
 // ---------------------------------------------------------------------------
-// Job status (simplified — no more REST polling for progress)
+// Job status (simplified â€” no more REST polling for progress)
 // ---------------------------------------------------------------------------
 
 export async function getJobStatus(jobId: string): Promise<JobStatus> {
@@ -1248,7 +1248,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
     };
   }
 
-  // Running — Gradio handles its own queue, we just report estimated time
+  // Running â€” Gradio handles its own queue, we just report estimated time
   return {
     status: job.status,
     etaSeconds: Math.max(0, 180 - elapsed),
@@ -1287,7 +1287,7 @@ export async function getAudioStream(audioPath: string): Promise<Response> {
     }
   }
 
-  // Absolute path — try reading directly from disk (Gradio output files)
+  // Absolute path â€” try reading directly from disk (Gradio output files)
   if (audioPath.startsWith('/')) {
     try {
       const buffer = await readFile(audioPath);

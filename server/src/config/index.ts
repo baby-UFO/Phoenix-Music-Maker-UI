@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+﻿import dotenv from 'dotenv';
 import path from 'path';
 import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -43,8 +43,8 @@ export const config = {
 
   // Training datasets (inside Phoenix Engine install so Gradio can access them)
   datasets: {
-    dir: process.env.DATASETS_DIR || path.join(__dirname, '../../../ACE-Step-1.5/datasets'),
-    uploadsDir: process.env.DATASETS_UPLOADS_DIR || path.join(__dirname, '../../../ACE-Step-1.5/datasets/uploads'),
+    dir: process.env.DATASETS_DIR || path.join(__dirname, '../../../Phoenix-Engine/datasets'),
+    uploadsDir: process.env.DATASETS_UPLOADS_DIR || path.join(__dirname, '../../../Phoenix-Engine/datasets/uploads'),
   },
 
   // Simplified JWT (for local session, not critical security)
