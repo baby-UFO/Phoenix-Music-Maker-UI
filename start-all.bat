@@ -74,7 +74,7 @@ if "%ACESTEP_LM_MODEL_PATH%"=="" (
 if "%ACESTEP_OFFLOAD_TO_CPU%"=="" set "ACESTEP_OFFLOAD_TO_CPU=true"
 if "%ACESTEP_OFFLOAD_DIT_TO_CPU%"=="" set "ACESTEP_OFFLOAD_DIT_TO_CPU=true"
 if "%ACESTEP_FORCE_LM_4B%"=="" set "ACESTEP_FORCE_LM_4B=true"
-)
+REM (removed stray closing paren that broke Full Monty startup)
 
 REM Detect Phoenix Engine installation type
 set API_COMMAND=

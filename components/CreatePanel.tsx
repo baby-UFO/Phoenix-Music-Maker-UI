@@ -256,8 +256,38 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
           localStorage.setItem(mig, '1');
         }
       } catch { /* ignore */ }
-      // Always prefer the v2 style adapter if saved path is missing/old
-      const bad = !parsed.loraPath || /lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v4/.test(parsed.loraPath);
+      // One-shot: sync qualityPreset + inferenceSteps so reload keeps Quality/100 (not orphaned 200-step slider)
+      try {
+        const migQ = 'phoenix-create-quality-sync-v1';
+        const firstRun = !localStorage.getItem(migQ);
+        let preset = parsed.qualityPreset as 'fast' | 'quality' | 'max' | null | undefined;
+        if (preset !== 'fast' && preset !== 'quality' && preset !== 'max') {
+          preset = 'quality';
+          parsed.qualityPreset = 'quality';
+        }
+        const stepsFor = (p: 'fast' | 'quality' | 'max') => (p === 'fast' ? 50 : p === 'quality' ? 100 : 200);
+        const expected = stepsFor(preset);
+        const steps = typeof parsed.inferenceSteps === 'number' ? parsed.inferenceSteps : expected;
+        // First run: sync steps to preset; orphaned 200 with quality/null/fast → Quality→100
+        if (firstRun) {
+          if (steps === 200 && preset !== 'max') {
+            parsed.qualityPreset = 'quality';
+            parsed.inferenceSteps = 100;
+          } else {
+            parsed.inferenceSteps = expected;
+          }
+          localStorage.setItem(migQ, '1');
+        } else if (steps === 200 && preset !== 'max') {
+          // Still fix orphaned Max-looking steps stuck under Fast/Quality
+          parsed.qualityPreset = 'quality';
+          parsed.inferenceSteps = 100;
+        } else if (steps !== expected && (steps > expected || steps < 1)) {
+          // Clamp / resync when steps fall outside the active preset's useful range
+          parsed.inferenceSteps = expected;
+        }
+      } catch { /* ignore */ }
+      // Prefer v4 adapter; rewrite missing, non-v4 lora_output/.../final, or Phoenix-Engine. ACE-Step-1.5 v4 is NOT bad.
+      const bad = !parsed.loraPath || /Phoenix-Engine/i.test(parsed.loraPath) || (/lora_output[/\\]final/.test(parsed.loraPath) && !/lora_output_v4/.test(parsed.loraPath));
       if (bad) parsed.loraPath = 'E:\\ACE-Step-1.5\\lora_output_v4\\final\\adapter';
       return parsed;
     } catch {
@@ -2667,32 +2697,48 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
               <p className="text-[10px] text-zinc-500">{t('queueMultipleJobs')}</p>
             </div>
 
-            {/* Inference Steps */}
-            <EditableSlider
-              label={t('inferenceSteps')}
-              value={inferenceSteps}
-              min={1}
-              max={isTurboModel(selectedModel) ? TURBO_INFER_STEPS_MAX : 200}
-              step={1}
-              onChange={(val) => {
-                setInferenceSteps(val);
-                // Raising above turbo cap switches to base so multi-step diffusion actually runs
-                if (val > TURBO_INFER_STEPS_MAX) {
-                  switchToNonTurboForHighSteps(val, selectedModel);
-                }
-              }}
-              helpText={t('moreStepsBetterQuality')}
-              title="More steps usually improves quality but slows generation."
-            />
-            {isTurboModel(selectedModel) ? (
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 -mt-1">
-                {`Turbo max ${TURBO_INFER_STEPS_MAX} (engine clamps higher). Steps > ${TURBO_INFER_STEPS_MAX} auto-switch to base for real multi-step diffusion.`}
-              </p>
-            ) : (
-              <p className="text-[10px] text-zinc-500 -mt-1">
-                Non-turbo DiT: up to 200 inference steps. Quality=100 / Max=200 presets pair model+steps so high settings cannot silently stay on turbo.
-              </p>
-            )}
+            {/* Inference Steps — max/step follow qualityPreset (or turbo cap); EditableSlider still allows typed values */}
+            {(() => {
+              const turbo = isTurboModel(selectedModel);
+              const stepsMax = turbo
+                ? TURBO_INFER_STEPS_MAX
+                : qualityPreset === 'fast'
+                  ? 50
+                  : qualityPreset === 'max'
+                    ? 200
+                    : 100; // quality / null → Quality range
+              const stepsStep = turbo ? 1 : qualityPreset === 'max' ? 10 : 5;
+              const clamped = Math.min(Math.max(1, inferenceSteps), stepsMax);
+              return (
+                <>
+                  <EditableSlider
+                    label={t('inferenceSteps')}
+                    value={clamped}
+                    min={1}
+                    max={stepsMax}
+                    step={stepsStep}
+                    onChange={(val) => {
+                      setInferenceSteps(val);
+                      // Raising above turbo cap switches to base so multi-step diffusion actually runs
+                      if (val > TURBO_INFER_STEPS_MAX) {
+                        switchToNonTurboForHighSteps(val, selectedModel);
+                      }
+                    }}
+                    helpText={t('moreStepsBetterQuality')}
+                    title="More steps usually improves quality but slows generation. Fast≤50 / Quality≤100 / Max≤200 (step 5 or 10)."
+                  />
+                  {turbo ? (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 -mt-1">
+                      {`Turbo max ${TURBO_INFER_STEPS_MAX} (engine clamps higher). Steps > ${TURBO_INFER_STEPS_MAX} auto-switch to base for real multi-step diffusion.`}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-zinc-500 -mt-1">
+                      {`Steps capped by preset: Fast≤50 / Quality≤100 / Max≤200 (step ${stepsStep}). Preset+steps persist together on reload.`}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Guidance Scale */}
             <EditableSlider
