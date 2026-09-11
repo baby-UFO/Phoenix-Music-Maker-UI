@@ -750,6 +750,46 @@ function readEngineBootConfig(): string | null {
   }
 }
 
+/** Live --config_path from the :8001 process (status JSON can be stale). */
+async function readLiveEngineConfigPath(): Promise<string | null> {
+  try {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFileAsync = promisify(execFile);
+    const { stdout: netOut } = await execFileAsync('netstat', ['-ano'], {
+      timeout: 2000,
+      windowsHide: true,
+      encoding: 'utf8',
+      maxBuffer: 2 * 1024 * 1024,
+    });
+    const pids = new Set<string>();
+    for (const line of String(netOut).split(/\r?\n/)) {
+      if (!/LISTENING/i.test(line) || !/:8001\b/.test(line)) continue;
+      const parts = line.trim().split(/\s+/);
+      const pid = parts[parts.length - 1];
+      if (pid && /^\d+$/.test(pid)) pids.add(pid);
+    }
+    for (const pid of pids) {
+      try {
+        const { stdout } = await execFileAsync(
+          'powershell',
+          ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`],
+          { timeout: 3000, windowsHide: true, encoding: 'utf8' },
+        );
+        const cmd = String(stdout || '');
+        const m = cmd.match(/--config_path\s+(\S+)/i);
+        if (m?.[1]) return toPhoenixModelId(m[1]);
+      } catch {
+        /* try next pid */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+
 function writeEngineBootConfig(configPath: string, isTurbo: boolean): void {
   try {
     const statusPath = path.join(ENGINE_DIR, 'phoenix-engine-status.json');
@@ -771,10 +811,20 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
   if (isTurboDitModel(phoenixId) || isTurboDitModel(ditModel)) {
     phoenixId = 'phoenix-v15-turbo';
   }
-  const boot = readEngineBootConfig();
-  if (boot === phoenixId) {
+  const statusBoot = readEngineBootConfig();
+  const liveBoot = await readLiveEngineConfigPath();
+  // Never trust status JSON alone — live PID may still be sft while status says turbo
+  if (liveBoot === phoenixId) {
+    if (statusBoot !== phoenixId) {
+      writeEngineBootConfig(phoenixId, /turbo/i.test(phoenixId));
+    }
     lastRequestedDitModel = phoenixId;
     return { restarted: false, configPath: phoenixId };
+  }
+  if (liveBoot && liveBoot !== phoenixId) {
+    console.log(`[Model] Live engine config_path=${liveBoot} (status=${statusBoot ?? 'none'}) ≠ ${phoenixId} — forcing restart`);
+  } else if (!liveBoot && statusBoot === phoenixId) {
+    console.log(`[Model] Status says ${phoenixId} but live config unknown — forcing restart to be sure`);
   }
 
   if (!isCheckpointOnDisk(phoenixId)) {
