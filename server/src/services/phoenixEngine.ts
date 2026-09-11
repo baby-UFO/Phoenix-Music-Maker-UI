@@ -639,10 +639,10 @@ function gradioPredictTimeoutMs(params: GenerationParams): number {
   const duration = Number(params.duration) || 120;
   const steps = Number(params.inferenceSteps) || 8;
   const turbo = !!(params.ditModel && /turbo/i.test(params.ditModel));
-  // Turbo: hard outer budget 120s so Node can self-lift before auth/HOL dies.
+  // Turbo: ≥360s outer budget (historical good turbo ~199s for dur~234; 120s was false-failing).
   // Non-turbo: base 3min, clamp →20 min.
   if (turbo) {
-    const turboMs = Math.min(120_000, Math.max(90_000, 90_000 + duration * 500 + steps * 2000));
+    const turboMs = Math.min(600_000, Math.max(360_000, 360_000 + Math.max(0, duration - 120) * 1000 + steps * 2000));
     return turboMs;
   }
   const base = 180_000;
@@ -1519,7 +1519,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
   }
 
   // Hung after pre-predict with no completion — fail + hardClose (pillar C stall)
-  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 90_000 : 180_000;
+  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 360_000 : 180_000;
   if (
     (job.status === 'running' || job.status === 'queued') &&
     job.prePredictAt &&
