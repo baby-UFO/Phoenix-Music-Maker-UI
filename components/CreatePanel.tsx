@@ -1850,12 +1850,12 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                             </span>
                             {fetchedModels.find(m => m.name === model.id)?.is_preloaded && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                {fetchedModels.find(m => m.name === model.id)?.is_active ? 'ÃƒÂ¢Ã¢â‚¬â€Ã‚Â Active' : 'ÃƒÂ¢Ã¢â‚¬â€Ã‚Â Ready'}
+                                {fetchedModels.find(m => m.name === model.id)?.is_active ? 'Active' : 'Ready'}
                               </span>
                             )}
                           </div>
                           {selectedModel === model.id && (
-                            <div className="w-4 h-4 rounded-full bg-pink-500 flex items-center justify-center">
+                            <div className="w-4 h-4 rounded-full bg-[#2F5D3A] flex items-center justify-center">
                               <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                               </svg>

@@ -1,4 +1,4 @@
-﻿import { writeFile, mkdir, copyFile, rm, readFile } from 'fs/promises';
+import { writeFile, mkdir, copyFile, rm, readFile } from 'fs/promises';
 import { spawn, execSync } from 'child_process';
 import { existsSync, readdirSync } from 'fs';
 import path from 'path';
@@ -129,8 +129,29 @@ async function prepareAudioFile(audioUrl: string | undefined): Promise<unknown> 
 }
 
 /**
- * Build the 50 positional arguments for the Gradio /generation_wrapper endpoint.
+ * Build the 50 positional arguments (Gradio Client API — States are auto-injected; do NOT pad null States) for the Gradio /generation_wrapper endpoint.
  */
+
+const GRADIO_TRACK_NAMES = new Set([
+  'woodwinds', 'brass', 'fx', 'synth', 'strings', 'percussion',
+  'keyboard', 'guitar', 'bass', 'drums', 'backing_vocals', 'vocals',
+]);
+
+/** Gradio track_name is an instruments Dropdown — never pass song titles. */
+function sanitizeGradioTrackName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const n = String(name).trim();
+  return GRADIO_TRACK_NAMES.has(n) ? n : null;
+}
+
+function sanitizeGradioTrackClasses(classes: string[] | string | null | undefined): string[] {
+  const arr = Array.isArray(classes)
+    ? classes
+    : typeof classes === 'string'
+      ? classes.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+  return arr.filter((c) => GRADIO_TRACK_NAMES.has(c));
+}
 async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   // Pass the user's BPM through unchanged. No doubling, no "felt tempo" caption hacks.
   const userBpm = params.bpm && params.bpm > 0 ? Math.round(params.bpm) : 0;
@@ -374,8 +395,8 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     params.repaintingStart ?? 0.0,                                // 15: Repainting Start
     params.repaintingEnd ?? -1,                                   // 16: Repainting End
     params.instruction || 'Fill the audio semantic mask with the style described in the text prompt.', // 17: Instruction
-    params.lmCodesStrength ?? 1.0,                                // 18: LM Codes Strength (Gradio)
-    params.audioCoverStrength ?? 1.0,                             // 19: Cover Strength (Gradio)
+    params.audioCoverStrength ?? 1.0,                             // 18: audio_cover_strength (Gradio UI order)
+    (params.coverNoiseStrength ?? 0.0),                           // 19: cover_noise_strength — MUST be 0 for text2music or DiT collapses to 1 step
     taskType,                                                     // 20: task_type
     params.useAdg ?? false,                                       // 21: Use ADG
     params.cfgIntervalStart ?? 0.0,                               // 22: CFG Interval Start
@@ -395,24 +416,20 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     wantCotMetas,                                                 // 34: CoT Metas
     wantCotCaption,                                               // 35: CaptionRewrite
     wantCotLanguage,                                              // 36: CoT Language
-    null,                                                         // 37: Gradio State (required placeholder)
-    params.constrainedDecodingDebug ?? false,                     // 38: Constrained Decoding Debug
-    params.allowLmBatch ?? true,                                  // 39: ParallelThinking
-    params.getScores ?? false,                                    // 40: Auto Score
-    params.getLrc ?? false,                                       // 41: Auto LRC
-    params.scoreScale ?? 0.5,                                     // 42: Quality Score Sensitivity
-    params.lmBatchChunkSize ?? 8,                                 // 43: LM Batch Chunk Size
-    params.trackName || null,                                     // 44: Track Name
-    params.completeTrackClasses || [],                            // 45: Track Names
-    true,                                                         // 46: Enable Normalization
-    -1.0,                                                         // 47: Target Peak (dB)
-    0.0,                                                          // 48: Latent Shift
-    1.0,                                                          // 49: Latent Rescale
-    params.autogen ?? false,                                      // 50: AutoGen
-    null,                                                         // 51: Gradio State
-    null,                                                         // 52: Gradio State
-    null,                                                         // 53: Gradio State
-    null,                                                         // 54: Gradio State
+    // is_format_caption_state is UI-only Gradio State — Client API omits it (auto-injected).
+    params.constrainedDecodingDebug ?? false,                     // 37: Constrained Decoding Debug
+    params.allowLmBatch ?? true,                                  // 38: ParallelThinking
+    params.getScores ?? false,                                    // 39: Auto Score
+    params.getLrc ?? false,                                       // 40: Auto LRC
+    params.scoreScale ?? 0.5,                                     // 41: Quality Score Sensitivity
+    params.lmBatchChunkSize ?? 8,                                 // 42: LM Batch Chunk Size
+    sanitizeGradioTrackName(params.trackName),                    // 43: Track Name (instruments Dropdown only)
+    sanitizeGradioTrackClasses(params.completeTrackClasses),      // 44: Complete Track Classes
+    true,                                                         // 45: Enable Normalization
+    -1.0,                                                         // 46: Target Peak (dB)
+    0.0,                                                          // 47: Latent Shift
+    1.0,                                                          // 48: Latent Rescale
+    params.autogen ?? false,                                      // 49: AutoGen (API last field; batch States auto-injected)
   ];
 }
 
@@ -817,15 +834,18 @@ async function processGeneration(
       await processGenerationViaGradio(jobId, params, job);
       return;
     } catch (error) {
-      console.error(`Job ${jobId}: Gradio generation failed, trying Python spawn fallback`, error);
-      // Fall through to Python spawn
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`Job ${jobId}: Gradio generation failed (no Python fallback while Gradio is up)`, error);
+      job.status = 'failed';
+      job.error = `Gradio generation failed: ${msg}`;
+      job.stage = 'Failed';
+      return;
     }
   }
 
-  // Fallback: Python spawn
+  // Python spawn only when Gradio is completely unavailable
   await processGenerationViaPython(jobId, params, job);
 }
-
 async function processGenerationViaGradio(
   jobId: string,
   params: GenerationParams,
@@ -856,7 +876,9 @@ async function processGenerationViaGradio(
     args6_ditSteps: args[6],
     args24_shift: args[24],
     args25_inferMethod: args[25],
-    args26_customTimesteps: args[26],
+    args18_audioCover: args[18],
+      args19_coverNoise: args[19],
+      args26_customTimesteps: args[26],
   });
   try {
     const fs = await import('fs');
@@ -871,7 +893,9 @@ async function processGenerationViaGradio(
         args6_ditSteps: args[6],
         args24_shift: args[24],
         args25_inferMethod: args[25],
-        args26_customTimesteps: args[26],
+        args18_audioCover: args[18],
+      args19_coverNoise: args[19],
+      args26_customTimesteps: args[26],
         duration: params.duration,
         argsLength: args.length,
       }) + '\n',
