@@ -1,11 +1,11 @@
-import { writeFile, mkdir, copyFile, rm, readFile, appendFile } from 'fs/promises';
+﻿import { writeFile, mkdir, copyFile, rm, readFile, appendFile } from 'fs/promises';
 import { spawn, execSync } from 'child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { handle_file } from '@gradio/client';
 
 // Get audio duration using ffprobe
-/** Prefer params.duration â€” never block the Node event loop with sync ffprobe (auth-timeout wedge). */
+/** Prefer params.duration Ã¢â‚¬â€ never block the Node event loop with sync ffprobe (auth-timeout wedge). */
 function getAudioDuration(filePath: string): number {
   // Sync ffprobe was blocking /api/auth/auto while /health stayed 200.
   // Duration is usually already on the job params / Gradio result; skip probe on hot path.
@@ -125,7 +125,7 @@ async function prepareAudioFile(audioUrl: string | undefined): Promise<unknown> 
 }
 
 /**
- * Build the 50 positional arguments (Gradio Client API â€” States are auto-injected; do NOT pad null States) for the Gradio /generation_wrapper endpoint.
+ * Build the 50 positional arguments (Gradio Client API Ã¢â‚¬â€ States are auto-injected; do NOT pad null States) for the Gradio /generation_wrapper endpoint.
  */
 
 const GRADIO_TRACK_NAMES = new Set([
@@ -133,7 +133,7 @@ const GRADIO_TRACK_NAMES = new Set([
   'keyboard', 'guitar', 'bass', 'drums', 'backing_vocals', 'vocals',
 ]);
 
-/** Gradio track_name is an instruments Dropdown â€” never pass song titles. */
+/** Gradio track_name is an instruments Dropdown Ã¢â‚¬â€ never pass song titles. */
 function sanitizeGradioTrackName(name: string | null | undefined): string | null {
   if (!name) return null;
   const n = String(name).trim();
@@ -254,7 +254,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     const otherParts = parts.filter((p) => !TIMBRE_RE.test(p));
     const seen = new Set<string>();
     const ordered: string[] = [];
-    // Timbre (JEJ/basso) before long RAP delivery list Ã¢â‚¬â€ depth was getting ignored when buried last
+    // Timbre (JEJ/basso) before long RAP delivery list ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â depth was getting ignored when buried last
     for (const p of [...timbreParts, ...rapLead, ...otherParts]) {
       const k = p.toLowerCase();
       if (seen.has(k)) continue;
@@ -265,7 +265,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   }
 
   // Force deep-basso depth wording when user asked for deep male / baritone / basso
-  // For rap: soft JEJ-depth pitch cue AFTER rap lead Ã¢â‚¬â€ never celebrity-actor / speaking-F0 lead.
+  // For rap: soft JEJ-depth pitch cue AFTER rap lead ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never celebrity-actor / speaking-F0 lead.
   const wantsJeJDepth = /\b(baritone|basso|profondo|james earl jones|jej-depth|chest voice|low male|deep male|oratorical)\b/i.test(prompt);
   if (wantsJeJDepth && !/jej-depth|james earl jones/i.test(prompt)) {
     const jejLead = wantsRap
@@ -273,7 +273,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
       : 'James Earl Jones-like extremely deep basso profondo male voice, speaking fundamental frequency ~90 Hz (about F#2), stay in ~85-100 Hz chest register, C2-G2, dark resonant chest voice, gravelly mature deep male timbre, rumbling low register, no tenor';
     prompt = wantsRap ? `${prompt}, ${jejLead}` : `${jejLead}, ${prompt}`;
   } else if (wantsRap && wantsJeJDepth) {
-    // Already has JEJ/depth wording Ã¢â‚¬â€ ensure rap lead is still first (promote may have run before rewrite)
+    // Already has JEJ/depth wording ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ensure rap lead is still first (promote may have run before rewrite)
     prompt = promoteVocals(prompt);
   }
 
@@ -314,7 +314,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     prompt = `${trigger}${prompt}`.replace(/,\s*,+/g, ', ').replace(/^,\s*/, '').trim();
   }
 
-  // Hard pitch-lock for JEJ/basso asks Ã¢â‚¬â€ model otherwise parks ~130 Hz light baritone.
+  // Hard pitch-lock for JEJ/basso asks ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â model otherwise parks ~130 Hz light baritone.
   if (/\b(james earl jones|jej-depth|basso|profondo|85-95\s*Hz|~90\s*Hz)\b/i.test(prompt)) {
     const pitchLock = 'James Earl Jones basso profondo, vocal fundamental ~90 Hz (F#2), stay below 100 Hz chest, one octave deeper than typical male rap, rumbling 85 Hz drone voice';
     if (!/vocal fundamental ~90 Hz/i.test(prompt)) {
@@ -337,7 +337,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   }
 
   const wantCotMetas = (isEnhance || isThinking) ? (params.useCotMetas ?? true) : (params.useCotMetas ?? false);
-  // Don't rewrite the user's caption when BPM is set Ã¢â‚¬â€ that was scrambling tempo cues
+  // Don't rewrite the user's caption when BPM is set ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â that was scrambling tempo cues
   const wantCotCaption = userBpm > 0 ? false : (isEnhance || isThinking) ? (params.useCotCaption ?? true) : false;
   const wantCotLanguage = (isEnhance || isThinking) ? (params.useCotLanguage ?? true) : false;
 
@@ -403,14 +403,14 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     params.repaintingEnd ?? -1,                                   // 16: Repainting End
     params.instruction || 'Fill the audio semantic mask with the style described in the text prompt.', // 17: Instruction
     params.audioCoverStrength ?? 1.0,                             // 18: audio_cover_strength (Gradio UI order)
-    (params.coverNoiseStrength ?? 0.0),                           // 19: cover_noise_strength â€” MUST be 0 for text2music or DiT collapses to 1 step
+    (params.coverNoiseStrength ?? 0.0),                           // 19: cover_noise_strength Ã¢â‚¬â€ MUST be 0 for text2music or DiT collapses to 1 step
     taskType,                                                     // 20: task_type
     params.useAdg ?? false,                                       // 21: Use ADG
     params.cfgIntervalStart ?? 0.0,                               // 22: CFG Interval Start
     params.cfgIntervalEnd ?? 1.0,                                 // 23: CFG Interval End
     (params.shift != null
       ? params.shift
-      : (params.ditModel && /turbo/i.test(params.ditModel) ? 3.0 : 1.0)), // 24: Shift â€” non-turbo known-good is 1.0 (SFT+LoRA); turbo keeps 3.0
+      : (params.ditModel && /turbo/i.test(params.ditModel) ? 3.0 : 1.0)), // 24: Shift Ã¢â‚¬â€ non-turbo known-good is 1.0 (SFT+LoRA); turbo keeps 3.0
     params.inferMethod || 'ode',                                  // 25: Inference Method
     params.customTimesteps || '',                                 // 26: Custom Timesteps
     params.audioFormat || 'mp3',                                  // 27: Audio Format
@@ -423,7 +423,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     wantCotMetas,                                                 // 34: CoT Metas
     wantCotCaption,                                               // 35: CaptionRewrite
     wantCotLanguage,                                              // 36: CoT Language
-    // is_format_caption_state is UI-only Gradio State â€” Client API omits it (auto-injected).
+    // is_format_caption_state is UI-only Gradio State Ã¢â‚¬â€ Client API omits it (auto-injected).
     params.constrainedDecodingDebug ?? false,                     // 37: Constrained Decoding Debug
     params.allowLmBatch ?? true,                                  // 38: ParallelThinking
     params.getScores ?? false,                                    // 39: Auto Score
@@ -590,7 +590,7 @@ interface ActiveJob {
   progress?: number;
   stage?: string;
   cancelled?: boolean;
-  /** Set when Gradio pre-predict is logged â€” used for stall detection. */
+  /** Set when Gradio pre-predict is logged Ã¢â‚¬â€ used for stall detection. */
   prePredictAt?: number;
 }
 
@@ -631,7 +631,7 @@ function gradioPredictTimeoutMs(params: GenerationParams): number {
   const duration = Number(params.duration) || 120;
   const steps = Number(params.inferenceSteps) || 8;
   const turbo = !!(params.ditModel && /turbo/i.test(params.ditModel));
-  // Turbo Create wall-clock is ~8â€“15s (outer ~20â€“30s). Do NOT babysit hung turbo for minutes.
+  // Turbo Create wall-clock is ~8Ã¢â‚¬â€œ15s (outer ~20Ã¢â‚¬â€œ30s). Do NOT babysit hung turbo for minutes.
   // Quality / non-turbo keeps the longer budget.
   if (turbo) {
     return Math.min(30_000, Math.max(20_000, 20_000 + Math.max(0, duration - 30) * 50));
@@ -647,7 +647,7 @@ export async function checkSpaceHealth(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Model switching Ã¢â‚¬â€ call /v1/init to change the active DiT model
+// Model switching ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â call /v1/init to change the active DiT model
 // ---------------------------------------------------------------------------
 
 /** Last DiT model we successfully targeted (engine /v1/models often returns "unknown"). */
@@ -691,8 +691,8 @@ function resolveNonTurboDitModel(): string {
 }
 
 /**
- * If turbo + high steps, force a non-turbo DiT so engine turbo clamp (infer_steps>8Ã¢â€ â€™8) does not apply.
- * Mutates params in place. Does NOT remove the engine clamp Ã¢â‚¬â€ wrong architecture.
+ * If turbo + high steps, force a non-turbo DiT so engine turbo clamp (infer_steps>8ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢8) does not apply.
+ * Mutates params in place. Does NOT remove the engine clamp ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â wrong architecture.
  */
 function enforceNonTurboForHighSteps(params: GenerationParams): void {
   if (params.ditModel) params.ditModel = toEngineModelId(params.ditModel);
@@ -703,14 +703,14 @@ function enforceNonTurboForHighSteps(params: GenerationParams): void {
   const target = resolveNonTurboDitModel();
   if (isTurboDitModel(params.ditModel) || !params.ditModel) {
     console.log(
-      `[Model] inferenceSteps=${steps} with turbo/missing ditModel '${params.ditModel ?? '(none)'}' Ã¢â€ â€™ forcing '${target}'`,
+      `[Model] inferenceSteps=${steps} with turbo/missing ditModel '${params.ditModel ?? '(none)'}' ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ forcing '${target}'`,
     );
     params.ditModel = target;
   }
 }
 
 async function getActiveModel(): Promise<string | null> {
-  // Prefer our last successful request Ã¢â‚¬â€ Gradio /v1/models often returns name "unknown"
+  // Prefer our last successful request ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Gradio /v1/models often returns name "unknown"
   if (lastRequestedDitModel) return lastRequestedDitModel;
   try {
     const res = await fetch(`${ENGINE_API}/v1/models`);
@@ -727,7 +727,7 @@ async function getActiveModel(): Promise<string | null> {
 
 /**
  * Attempt to switch DiT via /v1/init when available.
- * This Gradio build often 404s /v1/init Ã¢â‚¬â€ do NOT hard-fail; boot config_path must match.
+ * This Gradio build often 404s /v1/init ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â do NOT hard-fail; boot config_path must match.
  */
 
 function readEngineBootConfig(): string | null {
@@ -772,7 +772,7 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
     );
   }
 
-  console.log(`[Model] Boot DiT mismatch (status=${boot ?? 'none'}, wanted=${wanted}) â€” restarting Phoenix Engine...`);
+  console.log(`[Model] Boot DiT mismatch (status=${boot ?? 'none'}, wanted=${wanted}) Ã¢â‚¬â€ restarting Phoenix Engine...`);
 
   // Fail in-flight jobs + free Gradio slot BEFORE taskkill (orphaned await wedges HOL otherwise)
   for (const [jid, j] of activeJobs.entries()) {
@@ -886,7 +886,7 @@ async function switchModelIfNeeded(ditModel: string): Promise<void> {
     }
 
     if (res.status === 404) {
-      // Gradio portable build: no runtime /v1/init â€” restart with matching --config_path when needed.
+      // Gradio portable build: no runtime /v1/init Ã¢â‚¬â€ restart with matching --config_path when needed.
       const boot = readEngineBootConfig();
       if (boot && boot === ditModel) {
         lastRequestedDitModel = ditModel;
@@ -916,7 +916,7 @@ export async function discoverEndpoints(): Promise<unknown> {
   return { provider: 'phoenix-engine-gradio', endpoint: ENGINE_API };
 }
 
-// Reset client Ã¢â‚¬â€ forces Gradio reconnection on next request
+// Reset client ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â forces Gradio reconnection on next request
 export function resetClient(): void {
   resetGradioClient();
 }
@@ -990,7 +990,7 @@ export async function generateMusicViaAPI(params: GenerationParams): Promise<{ j
 }
 
 // ---------------------------------------------------------------------------
-// processGeneration Ã¢â‚¬â€ Gradio primary, Python spawn fallback
+// processGeneration ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Gradio primary, Python spawn fallback
 // ---------------------------------------------------------------------------
 
 async function processGeneration(
@@ -1003,13 +1003,13 @@ async function processGeneration(
     job.error = 'Cancelled';
     return;
   }
-  // Stay queued until Gradio pre-predict â€” avoids UI/DB "running/Generating" with no engine progress
+  // Stay queued until Gradio pre-predict Ã¢â‚¬â€ avoids UI/DB "running/Generating" with no engine progress
   job.status = 'queued';
-  job.stage = 'Startingâ€¦';
+  job.stage = 'StartingÃ¢â‚¬Â¦';
 
-  // Server-side safety: turbo + steps>8 Ã¢â€ â€™ force non-turbo DiT (engine still has its own clamp)
+  // Server-side safety: turbo + steps>8 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ force non-turbo DiT (engine still has its own clamp)
   enforceNonTurboForHighSteps(params);
-  // Boundary: translate Phoenix IDs Ã¢â€ â€™ engine acestep-* before Gradio/python
+  // Boundary: translate Phoenix IDs ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ engine acestep-* before Gradio/python
   if (params.ditModel) params.ditModel = toEngineModelId(params.ditModel);
   if (params.lmModel) params.lmModel = toEngineModelId(params.lmModel);
 
@@ -1103,7 +1103,7 @@ async function processGenerationViaGradio(
   job.stage = 'Generating music via Gradio...';
   job.status = 'running';
 
-  // predict() blocks until generation is complete â€” MUST timeout + hardClose on stall
+  // predict() blocks until generation is complete Ã¢â‚¬â€ MUST timeout + hardClose on stall
   const predictMs = gradioPredictTimeoutMs(params);
   let result;
   try {
@@ -1174,7 +1174,7 @@ async function processGenerationViaGradio(
     ).catch(() => {});
   } catch { /* ignore */ }
 
-  // Collect audio file objects Ã¢â‚¬â€ prefer the "All Generated Files" list
+  // Collect audio file objects ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â prefer the "All Generated Files" list
   let audioFileObjects: Array<{ url?: string; path?: string; orig_name?: string }> = [];
 
   if (Array.isArray(allFiles) && allFiles.length > 0) {
@@ -1485,7 +1485,7 @@ function runPythonGeneration(scriptArgs: string[], timeoutMs = 600000): Promise<
 }
 
 // ---------------------------------------------------------------------------
-// Job status (simplified Ã¢â‚¬â€ no more REST polling for progress)
+// Job status (simplified ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no more REST polling for progress)
 // ---------------------------------------------------------------------------
 
 export async function getJobStatus(jobId: string): Promise<JobStatus> {
@@ -1505,8 +1505,8 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
     };
   }
 
-  // Hung after pre-predict with no completion â€” fail + hardClose (pillar C stall)
-  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 25_000 : 180_000;
+  // Hung after pre-predict with no completion Ã¢â‚¬â€ fail + hardClose (pillar C stall)
+  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 360_000 : 180_000;
   if (
     (job.status === 'running' || job.status === 'queued') &&
     job.prePredictAt &&
@@ -1549,7 +1549,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
     };
   }
 
-  // Running Ã¢â‚¬â€ Gradio handles its own queue, we just report estimated time
+  // Running ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Gradio handles its own queue, we just report estimated time
   return {
     status: job.status,
     etaSeconds: Math.max(0, 180 - elapsed),
@@ -1588,7 +1588,7 @@ export async function getAudioStream(audioPath: string): Promise<Response> {
     }
   }
 
-  // Absolute path Ã¢â‚¬â€ try reading directly from disk (Gradio output files)
+  // Absolute path ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â try reading directly from disk (Gradio output files)
   if (audioPath.startsWith('/')) {
     try {
       const buffer = await readFile(audioPath);
@@ -1672,7 +1672,7 @@ export function cancelEngineJob(jobId: string): boolean {
 
 
 
-/** Cached ESTABâ†’:8001 probe â€” never execSync on hot/boot path (was stalling auth). */
+/** Cached ESTABÃ¢â€ â€™:8001 probe Ã¢â‚¬â€ never execSync on hot/boot path (was stalling auth). */
 let estabCache: { at: number; value: boolean } | null = null;
 const ESTAB_CACHE_MS = 1000;
 
@@ -1707,9 +1707,9 @@ async function hasEstablishedGradioSockets(): Promise<boolean> {
  * On server boot/recycle: clear eternal ghosts, but do NOT false-fail live Creates.
  * - queued/pending age <120s: skip
  * - running age <30s (turbo stall window): skip
- * - any orphan while ESTABLISHEDâ†’:8001: skip (Gradio still has the task)
+ * - any orphan while ESTABLISHEDÃ¢â€ â€™:8001: skip (Gradio still has the task)
  * - do NOT use a 360s babysit window
- * - older orphans with no ESTAB: fail `Server recycled â€” job lost`
+ * - older orphans with no ESTAB: fail `Server recycled Ã¢â‚¬â€ job lost`
  */
 export async function reconcileOrphanGenerationJobs(): Promise<number> {
   try {
@@ -1719,7 +1719,7 @@ export async function reconcileOrphanGenerationJobs(): Promise<number> {
     );
     const estab = await hasEstablishedGradioSockets();
     if (estab) {
-      console.log('[Boot] ESTABLISHEDâ†’:8001 present â€” skipping orphan reclaim this pass');
+      console.log('[Boot] ESTABLISHEDÃ¢â€ â€™:8001 present Ã¢â‚¬â€ skipping orphan reclaim this pass');
       return 0;
     }
 
@@ -1742,13 +1742,13 @@ export async function reconcileOrphanGenerationJobs(): Promise<number> {
       const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
       const ageMs = createdMs ? now - createdMs : Number.POSITIVE_INFINITY;
 
-      // Fresh queued â€” worker may still be about to start predict
+      // Fresh queued Ã¢â‚¬â€ worker may still be about to start predict
       if ((row.status === 'queued' || row.status === 'pending') && ageMs < 120_000) {
         console.log(`[Boot] skip young queued orphan ${row.id} age=${Math.round(ageMs / 1000)}s`);
         continue;
       }
 
-      // Fresh running, no ESTAB (checked above): skip if age <120s â€” not a 360s babysit
+      // Fresh running, no ESTAB (checked above): skip if age <120s Ã¢â‚¬â€ not a 360s babysit
       if (row.status === 'running' && ageMs < 120_000) {
         console.log(`[Boot] skip young running orphan ${row.id} age=${Math.round(ageMs / 1000)}s`);
         continue;
@@ -1757,13 +1757,13 @@ export async function reconcileOrphanGenerationJobs(): Promise<number> {
       await pool.query(
         `UPDATE generation_jobs SET status = 'failed', error = ?, updated_at = datetime('now')
          WHERE id = ? AND status IN ('pending', 'queued', 'running')`,
-        ['Server recycled â€” job lost', row.id],
+        ['Server recycled Ã¢â‚¬â€ job lost', row.id],
       );
       marked += 1;
-      console.warn(`[Boot] orphan generation_job ${row.id} (engine=${engineId || 'none'}, status=${row.status}, age=${Math.round(ageMs / 1000)}s) â†’ failed`);
+      console.warn(`[Boot] orphan generation_job ${row.id} (engine=${engineId || 'none'}, status=${row.status}, age=${Math.round(ageMs / 1000)}s) Ã¢â€ â€™ failed`);
     }
     if (marked > 0) {
-      console.log(`[Boot] marked ${marked} orphan generation_jobs as failed (Server recycled â€” job lost)`);
+      console.log(`[Boot] marked ${marked} orphan generation_jobs as failed (Server recycled Ã¢â‚¬â€ job lost)`);
     } else {
       console.log('[Boot] no orphan generation_jobs reclaimed');
     }
