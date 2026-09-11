@@ -156,9 +156,9 @@ export const SongList: React.FC<SongListProps> = ({
             // 2. Filter Logic
             if (activeFilters.size === 0) return true;
 
-            if (      // Always show queued/generating workspace rows regardless of liked/other filters
-      if (song.isGenerating) return true;
-activeFilters.has('liked') && !likedSongIds.has(song.id)) return false;
+            // Always show queued/generating workspace rows regardless of liked/other filters
+            if (song.isGenerating) return true;
+            if (activeFilters.has('liked') && !likedSongIds.has(song.id)) return false;
             if (activeFilters.has('generating') && !song.isGenerating) return false;
 
             return true;
@@ -555,22 +555,17 @@ const SongItem: React.FC<SongItemProps> = ({
 
                 {song.isGenerating ? (
                     <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1">
+                        {/* Always show music-bar-anim while generating; Queue # / Creating… are labels only */}
+                        <div className="flex items-end gap-1 h-6">
+                            <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.0s' }}></div>
+                            <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
+                            <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.4s' }}></div>
+                            <div className="w-1 h-3 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.1s' }}></div>
+                        </div>
                         {song.queuePosition ? (
-                            /* Queue indicator */
-                            <>
-                                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
-                                    <Clock size={16} className="text-amber-400" />
-                                </div>
-                                <span className="text-[10px] font-medium text-amber-400">Queue #{song.queuePosition}</span>
-                            </>
+                            <span className="text-[10px] font-medium text-amber-400">Queue #{song.queuePosition}</span>
                         ) : (
-                            /* Generating - Music Waveform Animation */
-                            <div className="flex items-end gap-1 h-6">
-                                <div className="w-1 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.0s' }}></div>
-                                <div className="w-1 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
-                                <div className="w-1 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.4s' }}></div>
-                                <div className="w-1 bg-emerald-500 rounded-full music-bar-anim" style={{ animationDelay: '0.1s' }}></div>
-                            </div>
+                            <span className="text-[10px] font-medium text-emerald-400">Creating…</span>
                         )}
                     </div>
                 ) : (
