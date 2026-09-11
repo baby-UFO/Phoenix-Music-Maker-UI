@@ -1,5 +1,5 @@
 import React from 'react';
-import { Library, Disc, Search, LogIn, LogOut, Sun, Moon, GraduationCap, Newspaper } from 'lucide-react';
+import { LogIn, LogOut, Sun, Moon } from 'lucide-react';
 import { View } from '../types';
 import { useI18n } from '../context/I18nContext';
 
@@ -64,17 +64,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="w-14 h-14 rounded-full overflow-hidden cursor-pointer shadow-lg hover:scale-105 transition-transform flex-shrink-0 ring-1 ring-orange-500/40 p-0 border-0 bg-transparent"
+            className="w-16 h-16 rounded-full overflow-hidden cursor-pointer shadow-lg hover:scale-105 transition-transform flex-shrink-0 ring-1 ring-orange-500/40 p-0 border-0 bg-transparent"
             onClick={() => onNavigate('create')}
             title={t('phoenixMusicMaker')}
             aria-label={t('phoenixMusicMaker')}
           >
             <img
-              src="/phoenix-mark.svg"
+              src="/phoenix-mark.gif"
               alt=""
-              width={56}
-              height={56}
-              className="w-14 h-14 block"
+              width={64}
+              height={64}
+              className="w-16 h-16 block"
               draggable={false}
             />
           </button>
@@ -102,35 +102,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <nav className="flex-1 flex flex-col gap-2 w-full px-3">
         <NavItem
-          icon={<Disc size={20} />}
+          icon={<img src="/icons/icon-create.svg" alt="" className="w-6 h-6" draggable={false} />}
           label={t('create')}
           active={currentView === 'create'}
           onClick={() => onNavigate('create')}
           isExpanded={isOpen}
         />
         <NavItem
-          icon={<Library size={20} />}
+          icon={<img src="/icons/icon-library.svg" alt="" className="w-6 h-6" draggable={false} />}
           label={t('library')}
           active={currentView === 'library'}
           onClick={() => onNavigate('library')}
           isExpanded={isOpen}
         />
         <NavItem
-          icon={<Search size={20} />}
+          icon={<img src="/icons/icon-search.svg" alt="" className="w-6 h-6" draggable={false} />}
           label={t('search')}
           active={currentView === 'search'}
           onClick={() => onNavigate('search')}
           isExpanded={isOpen}
         />
         <NavItem
-          icon={<GraduationCap size={20} />}
+          icon={<img src="/icons/icon-training.svg" alt="" className="w-6 h-6" draggable={false} />}
           label={t('training')}
           active={currentView === 'training'}
           onClick={() => onNavigate('training')}
           isExpanded={isOpen}
         />
         <NavItem
-          icon={<Newspaper size={20} />}
+          icon={<img src="/icons/icon-news.svg" alt="" className="w-6 h-6" draggable={false} />}
           label={t('news')}
           active={currentView === 'news'}
           onClick={() => onNavigate('news')}
