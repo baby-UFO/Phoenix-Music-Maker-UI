@@ -743,7 +743,8 @@ function readEngineBootConfig(): string | null {
     const statusPath = path.join(ENGINE_DIR, 'phoenix-engine-status.json');
     if (!existsSync(statusPath)) return null;
     const st = JSON.parse(readFileSync(statusPath, 'utf8')) as { config_path?: string };
-    return st?.config_path ? toEngineModelId(String(st.config_path)) : null;
+    // Brand: compare/boot as phoenix-* (never acestep-* for Turbo ensure-dit)
+    return st?.config_path ? toPhoenixModelId(String(st.config_path)) : null;
   } catch {
     return null;
   }
@@ -765,22 +766,25 @@ function writeEngineBootConfig(configPath: string, isTurbo: boolean): void {
 
 /** Restart Phoenix Engine with --config_path matching the Quality chip (boot-only DiT select). */
 export async function ensureEngineBootConfig(ditModel: string): Promise<{ restarted: boolean; configPath: string }> {
-  const wanted = toEngineModelId(ditModel);
-  const phoenixId = toPhoenixModelId(wanted);
+  // Brand: Turbo ensure-dit MUST boot phoenix-v15-turbo (not sft, not acestep-*)
+  let phoenixId = toPhoenixModelId(ditModel);
+  if (isTurboDitModel(phoenixId) || isTurboDitModel(ditModel)) {
+    phoenixId = 'phoenix-v15-turbo';
+  }
   const boot = readEngineBootConfig();
-  if (boot === wanted) {
-    lastRequestedDitModel = wanted;
+  if (boot === phoenixId) {
+    lastRequestedDitModel = phoenixId;
     return { restarted: false, configPath: phoenixId };
   }
 
-  if (!isCheckpointOnDisk(wanted)) {
+  if (!isCheckpointOnDisk(phoenixId)) {
     throw new Error(
       `Phoenix DiT checkpoint '${phoenixId}' is not on disk under ${ENGINE_DIR}/checkpoints. ` +
       `Download it, then retry.`,
     );
   }
 
-  console.log(`[Model] Boot DiT mismatch (status=${boot ?? 'none'}, wanted=${wanted}) Ã¢â‚¬â€ restarting Phoenix Engine...`);
+  console.log(`[Model] Boot DiT mismatch (status=${boot ?? 'none'}, wanted=${phoenixId}) — restarting Phoenix Engine...`);
 
   // Fail in-flight jobs + free Gradio slot BEFORE taskkill (orphaned await wedges HOL otherwise)
   for (const [jid, j] of activeJobs.entries()) {
@@ -818,19 +822,18 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
   const python = resolvePythonPath(ENGINE_DIR);
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    ACESTEP_CONFIG_PATH: toEngineModelId(phoenixId),
-    PHOENIX_ENGINE_CONFIG_PATH: toEngineModelId(phoenixId),
+    ACESTEP_CONFIG_PATH: phoenixId,
+    PHOENIX_ENGINE_CONFIG_PATH: phoenixId,
     ACESTEP_FORCE_LM_4B: 'true',
     ACESTEP_OFFLOAD_TO_CPU: 'false',
     ACESTEP_OFFLOAD_DIT_TO_CPU: 'false',
   };
-  // Ace-era turbo pipeline: boot acestep-* checkpoint folder under Phoenix-Engine (UI ids stay phoenix-*)
-  const tryIds = [toEngineModelId(phoenixId), phoenixId];
+  // Prefer phoenix-* checkpoint folder on disk; Turbo config_path stays phoenix-v15-turbo (never acestep-*)
+  const tryIds = [phoenixId, toEngineModelId(phoenixId)];
   for (const id of tryIds) {
     if (existsSync(path.join(ENGINE_DIR, 'checkpoints', id))) {
-      const engineId = toEngineModelId(id);
-      env.ACESTEP_CONFIG_PATH = engineId;
-      env.PHOENIX_ENGINE_CONFIG_PATH = engineId;
+      env.ACESTEP_CONFIG_PATH = phoenixId;
+      env.PHOENIX_ENGINE_CONFIG_PATH = phoenixId;
       break;
     }
   }
@@ -859,9 +862,9 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
   }
 
   resetGradioClient();
-  lastRequestedDitModel = wanted;
+  lastRequestedDitModel = phoenixId;
   console.log(`[Model] Phoenix Engine ready with boot config ${env.ACESTEP_CONFIG_PATH}`);
-  return { restarted: true, configPath: toPhoenixModelId(String(env.ACESTEP_CONFIG_PATH)) };
+  return { restarted: true, configPath: phoenixId };
 }
 
 async function switchModelIfNeeded(ditModel: string): Promise<void> {
