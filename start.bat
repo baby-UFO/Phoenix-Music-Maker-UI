@@ -1,4 +1,5 @@
 @echo off
+title Phoenix Music Maker UI
 REM Phoenix Music Maker Startup Script for Windows
 setlocal
 
@@ -32,15 +33,15 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
 echo Starting Phoenix Music Maker...
 echo.
 echo Make sure Phoenix Engine API is running:
-echo   cd path\to\Phoenix Engine
-echo   uv run acestep-api --port 8001
+echo   cd /d E:\Phoenix-Engine
+echo   (start Phoenix Engine API on port 8001)
 echo.
 echo ==================================
 echo.
 
 REM Start backend in new window
 echo Starting backend server...
-start "Phoenix Music Maker Backend" cmd /k "cd server && npm run dev"
+start "Phoenix Music Maker UI Backend" cmd /k "cd server && npm run dev"
 
 REM Wait for backend to start
 echo Waiting for backend to start...
@@ -48,7 +49,7 @@ timeout /t 3 /nobreak >nul
 
 REM Start frontend in new window
 echo Starting frontend...
-start "Phoenix Music Maker Frontend" cmd /k "npm run dev"
+start "Phoenix Music Maker UI" cmd /k "npm run dev"
 
 REM Wait a moment
 timeout /t 2 /nobreak >nul

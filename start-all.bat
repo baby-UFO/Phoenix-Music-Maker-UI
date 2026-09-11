@@ -1,4 +1,5 @@
 @echo off
+title Phoenix Music Maker
 REM Phoenix Music Maker Complete Startup Script for Windows
 REM Starts Phoenix Engine + Backend + Frontend
 setlocal EnableDelayedExpansion
@@ -27,8 +28,15 @@ REM Get Phoenix Engine path from environment or use default
 if not "%PHOENIX_ENGINE_PATH%"=="" (
     set ACESTEP_PATH=%PHOENIX_ENGINE_PATH%
 )
+
 if "%ACESTEP_PATH%"=="" (
-    set ACESTEP_PATH=..\ACE-Step-1.5
+    if exist "..\Phoenix-Engine\" (
+        set ACESTEP_PATH=..\Phoenix-Engine
+    ) else if exist "E:\Phoenix-Engine\" (
+        set ACESTEP_PATH=E:\Phoenix-Engine
+    ) else (
+        set ACESTEP_PATH=..\ACE-Step-1.5
+    )
 )
 
 REM Check if Phoenix Engine exists
@@ -36,8 +44,8 @@ if not exist "%ACESTEP_PATH%" (
     echo.
     echo Warning: Phoenix Engine not found at %ACESTEP_PATH%
     echo.
-    echo Please set PHOENIX_ENGINE_PATH or place ACE-Step-1.5 next to Phoenix-Music-Maker-UI
-    echo Example: set PHOENIX_ENGINE_PATH=C:\ACE-Step-1.5
+    echo Please set PHOENIX_ENGINE_PATH or place Phoenix-Engine next to Phoenix-Music-Maker-UI
+    echo Example: set PHOENIX_ENGINE_PATH=E:\Phoenix-Engine
     echo.
     pause
     exit /b 1
@@ -109,7 +117,7 @@ timeout /t 5 /nobreak >nul
 
 REM Start backend in new window
 echo [2/3] Starting backend server...
-start "Phoenix Music Maker Backend" cmd /k "cd /d "%~dp0server" && npm run dev"
+start "Phoenix Music Maker UI Backend" cmd /k "cd /d "%~dp0server" && npm run dev"
 
 REM Wait for backend to start
 echo Waiting for backend to start...
@@ -117,7 +125,7 @@ timeout /t 3 /nobreak >nul
 
 REM Start frontend in new window
 echo [3/3] Starting frontend...
-start "Phoenix Music Maker Frontend" cmd /k "cd /d "%~dp0" && npm run dev"
+start "Phoenix Music Maker UI" cmd /k "cd /d "%~dp0" && npm run dev"
 
 REM Wait a moment
 timeout /t 2 /nobreak >nul

@@ -1,4 +1,5 @@
 @echo off
+title Phoenix Music Maker Setup
 REM Phoenix Music Maker Setup Script for Windows
 setlocal enabledelayedexpansion
 
@@ -62,8 +63,8 @@ echo.
 echo Next steps:
 echo.
 echo   1. Start Phoenix Engine API (in engine folder):
-echo      cd path\to\Phoenix Engine
-echo      uv run acestep-api --port 8001
+echo      cd /d E:\Phoenix-Engine
+echo      (or run start-all.bat to launch everything)
 echo.
 echo   2. Start Phoenix Music Maker:
 echo      start.bat
