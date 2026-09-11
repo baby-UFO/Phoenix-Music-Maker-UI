@@ -1058,18 +1058,6 @@ function AppContent() {
 
         const activeStatuses = new Set(['pending', 'queued', 'running']);
         const jobsToResume = jobs.filter((job: any) => activeStatuses.has(job.status));
-        if (jobsToResume.length === 0) {
-          // No active server jobs — clear ghost generating UI (e.g. after zombie cancel while poll lost).
-          setSongs(prev => prev.filter(s => !s.isGenerating));
-          if (activeJobsRef.current.size > 0) {
-            activeJobsRef.current.forEach(({ pollInterval }) => clearInterval(pollInterval));
-            activeJobsRef.current.clear();
-            setActiveJobCount(0);
-          }
-          setIsGenerating(false);
-          return;
-        }
-
 
         if (jobsToResume.length === 0) return;
 
