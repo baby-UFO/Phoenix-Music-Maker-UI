@@ -20,6 +20,7 @@ function getAudioDuration(filePath: string): number {
 }
 import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
+import { pool } from '../db/pool.js';
 import { getGradioClient, resetGradioClient, isGradioAvailable, setInFlightGradioClient, forceCloseGradioSockets } from './gradio-client.js';
 import { ensureLoraOffForTurbo } from './loraGuard.js';
 import { toEngineModelId, toPhoenixModelId } from '../utils/phoenixModels.js';
@@ -638,8 +639,13 @@ function gradioPredictTimeoutMs(params: GenerationParams): number {
   const duration = Number(params.duration) || 120;
   const steps = Number(params.inferenceSteps) || 8;
   const turbo = !!(params.ditModel && /turbo/i.test(params.ditModel));
-  // Turbo: tighter default (base 2.5min); non-turbo: base 3min. Clamp →20 min.
-  const base = turbo ? 150_000 : 180_000;
+  // Turbo: hard outer budget 120s so Node can self-lift before auth/HOL dies.
+  // Non-turbo: base 3min, clamp →20 min.
+  if (turbo) {
+    const turboMs = Math.min(120_000, Math.max(90_000, 90_000 + duration * 500 + steps * 2000));
+    return turboMs;
+  }
+  const base = 180_000;
   return Math.min(1_200_000, Math.max(base, base + duration * 2000 + steps * 5000));
 }
 
@@ -1513,7 +1519,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
   }
 
   // Hung after pre-predict with no completion — fail + hardClose (pillar C stall)
-  const STALL_MS = 180_000;
+  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 90_000 : 180_000;
   if (
     (job.status === 'running' || job.status === 'queued') &&
     job.prePredictAt &&
@@ -1675,6 +1681,46 @@ export function cancelEngineJob(jobId: string): boolean {
     void processQueue();
   }
   return true;
+}
+
+
+
+/** On server boot/recycle: DB queued|running with phoenix_task_id but not in activeJobs → fail (no eternal ghosts). */
+export async function reconcileOrphanGenerationJobs(): Promise<number> {
+  try {
+    const result = await pool.query(
+      `SELECT id, phoenix_task_id, status FROM generation_jobs
+       WHERE status IN ('pending', 'queued', 'running')`,
+    );
+    let marked = 0;
+    for (const row of result.rows as Array<{ id: string; phoenix_task_id?: string | null; status: string }>) {
+      const engineId = row.phoenix_task_id;
+      if (engineId && activeJobs.has(engineId)) {
+        // Still live in this process — ensure queue is draining
+        if (!isProcessingQueue && jobQueue.length > 0) {
+          void processQueue();
+        }
+        continue;
+      }
+      // No in-memory job after bounce (or never started predict)
+      await pool.query(
+        `UPDATE generation_jobs SET status = 'failed', error = ?, updated_at = datetime('now')
+         WHERE id = ? AND status IN ('pending', 'queued', 'running')`,
+        ['Server recycled — job lost', row.id],
+      );
+      marked += 1;
+      console.warn(`[Boot] orphan generation_job ${row.id} (engine=${engineId || 'none'}) → failed`);
+    }
+    if (marked > 0) {
+      console.log(`[Boot] marked ${marked} orphan generation_jobs as failed (Server recycled — job lost)`);
+    } else {
+      console.log('[Boot] no orphan generation_jobs');
+    }
+    return marked;
+  } catch (e) {
+    console.error('[Boot] reconcileOrphanGenerationJobs failed:', e);
+    return 0;
+  }
 }
 
 export function cleanupJob(jobId: string): void {

@@ -29,6 +29,7 @@ import loraRoutes from './routes/lora.js';
 import trainingRoutes from './routes/training.js';
 import newsRoutes from './routes/news.js';
 import { pool } from './db/pool.js';
+import { reconcileOrphanGenerationJobs } from './services/phoenixEngine.js';
 import './db/migrate.js';
 
 process.on("unhandledRejection", (err) => {
@@ -488,6 +489,9 @@ app.listen(config.port, '0.0.0.0', () => {
   console.log(`Phoenix Music Maker Server running on http://localhost:${config.port}`);
   console.log(`Environment: ${config.nodeEnv}`);
   console.log(`Phoenix Engine API: ${config.phoenixEngine.apiUrl}`);
+
+  // Clear eternal queued/running ghosts left after Node bounce (in-memory map empty)
+  void reconcileOrphanGenerationJobs();
 
   // Show LAN access info
   import('os').then(os => {
