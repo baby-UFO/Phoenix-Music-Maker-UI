@@ -18,6 +18,7 @@ import {
   getJobRawResponse,
   downloadAudioToBuffer,
   resolvePythonPath,
+  ensureEngineBootConfig,
 } from '../services/phoenixEngine.js';
 import { getStorageProvider } from '../services/storage/factory.js';
 import { toEngineModelId, toPhoenixModelId, getPhoenixModelLabel, PHOENIX_DIT_MODELS, PHOENIX_LM_MODELS } from '../utils/phoenixModels.js';
@@ -704,9 +705,34 @@ router.get('/endpoints', authMiddleware, async (_req: AuthenticatedRequest, res:
   }
 });
 
+
+// POST /api/generate/ensure-dit — restart Phoenix Engine when Quality chip needs a different boot DiT
+router.post('/ensure-dit', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const ditModel = String(req.body?.ditModel || req.body?.config_path || '').trim();
+    if (!ditModel) {
+      res.status(400).json({ error: 'ditModel is required (phoenix-v15-turbo|base|sft)' });
+      return;
+    }
+    const result = await ensureEngineBootConfig(ditModel);
+    res.json({
+      ok: true,
+      restarted: result.restarted,
+      configPath: result.configPath,
+      note: result.restarted
+        ? 'Phoenix Engine restarted with new --config_path. Re-load LoRA after restart.'
+        : 'Boot DiT already matched; no restart.',
+    });
+  } catch (error) {
+    console.error('ensure-dit error:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to ensure DiT boot config' });
+  }
+});
+
 router.get('/models', async (_req, res: Response) => {
   try {
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const rawEngineDir = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const PHOENIX_ENGINE_DIR = /ace-step|ACE-Step/i.test(rawEngineDir) ? 'E:\\Phoenix-Engine' : rawEngineDir;
     const checkpointsDir = path.join(PHOENIX_ENGINE_DIR, 'checkpoints');
 
     // All known DiT models from Gradio's model_downloader.py registry:
@@ -732,7 +758,9 @@ router.get('/models', async (_req, res: Response) => {
         const data = await apiRes.json() as any;
         const gradioModels = data?.data?.models || data?.models || [];
         if (gradioModels.length > 0) {
-          activeModel = gradioModels[0]?.name || null;
+          const n = gradioModels[0]?.name || null;
+          // This Gradio build often reports name "unknown" — treat as unset so boot status can win.
+          activeModel = n && n !== 'unknown' ? n : null;
         }
       }
     } catch {
@@ -839,7 +867,8 @@ router.get('/models', async (_req, res: Response) => {
 // GET /api/generate/lm-models â€” 5Hz LM checkpoints with disk preload truth
 router.get('/lm-models', async (_req, res: Response) => {
   try {
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const rawEngineDir = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const PHOENIX_ENGINE_DIR = /ace-step|ACE-Step/i.test(rawEngineDir) ? 'E:\\Phoenix-Engine' : rawEngineDir;
     const checkpointsDir = path.join(PHOENIX_ENGINE_DIR, 'checkpoints');
     const lmModels = listLmModelsFromDisk(checkpointsDir);
     const preferred = ['phoenix-5Hz-lm-4B', 'phoenix-5Hz-lm-1.7B', 'phoenix-5Hz-lm-0.6B'];
@@ -888,7 +917,8 @@ router.get('/health', async (_req, res: Response) => {
 router.get('/limits', async (_req, res: Response) => {
   try {
     const { spawn } = await import('child_process');
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const rawEngineDir = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const PHOENIX_ENGINE_DIR = /ace-step|ACE-Step/i.test(rawEngineDir) ? 'E:\\Phoenix-Engine' : rawEngineDir;
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
@@ -1019,7 +1049,8 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
 
     // Fallback: Python spawn (only reached when REST API is unreachable)
     const { spawn } = await import('child_process');
-    const PHOENIX_ENGINE_DIR = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const rawEngineDir = process.env.PHOENIX_ENGINE_PATH || process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../Phoenix-Engine');
+    const PHOENIX_ENGINE_DIR = /ace-step|ACE-Step/i.test(rawEngineDir) ? 'E:\\Phoenix-Engine' : rawEngineDir;
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const SCRIPTS_DIR = path.join(__dirname, '../../scripts');

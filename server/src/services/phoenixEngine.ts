@@ -1,6 +1,6 @@
 import { writeFile, mkdir, copyFile, rm, readFile } from 'fs/promises';
 import { spawn, execSync } from 'child_process';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { handle_file } from '@gradio/client';
 
@@ -152,6 +152,19 @@ function sanitizeGradioTrackClasses(classes: string[] | string | null | undefine
       : [];
   return arr.filter((c) => GRADIO_TRACK_NAMES.has(c));
 }
+/** Gradio Time Signature dropdown only accepts '', '2', '3', '4', '6', 'N/A' (not '4/4'). */
+function normalizeGradioTimeSignature(raw: string | undefined | null): string {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  if (!s) return '';
+  if (s === 'N/A' || s === '2' || s === '3' || s === '4' || s === '6') return s;
+  // '4/4' | '3/4' | '6/8' -> numerator the dropdown understands
+  const m = s.match(/^([2364])\s*\/\s*\d+/);
+  if (m) return m[1];
+  if (/^[2364]$/.test(s)) return s;
+  return '';
+}
+
 async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   // Pass the user's BPM through unchanged. No doubling, no "felt tempo" caption hacks.
   const userBpm = params.bpm && params.bpm > 0 ? Math.round(params.bpm) : 0;
@@ -381,7 +394,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     lyrics,                                                       //  1: Lyrics
     userBpm,                                                      //  2: BPM (exact user value)
     params.keyScale || '',                                        //  3: Key
-    (userBpm > 0 ? (params.timeSignature || '4/4') : (params.timeSignature || '')), //  4: Time Signature
+    (userBpm > 0 ? (normalizeGradioTimeSignature(params.timeSignature) || '4') : normalizeGradioTimeSignature(params.timeSignature)), //  4: Time Signature (Gradio literals, not '4/4')
     params.vocalLanguage || 'en',                                 //  5: Vocal Language
     params.inferenceSteps ?? 8,                                   //  6: DiT Inference Steps
     params.guidanceScale ?? 7.0,                                  //  7: DiT Guidance Scale
@@ -607,8 +620,8 @@ export async function checkSpaceHealth(): Promise<boolean> {
 let lastRequestedDitModel: string | null = null;
 
 const TURBO_STEPS_CAP = 8;
-const PREFERRED_NON_TURBO = 'acestep-v15-base';
-const FALLBACK_NON_TURBO = 'acestep-v15-sft';
+const PREFERRED_NON_TURBO = 'acestep-v15-sft';
+const FALLBACK_NON_TURBO = 'acestep-v15-base';
 
 function isTurboDitModel(model?: string | null): boolean {
   return !!model && model.toLowerCase().includes('turbo');
@@ -682,6 +695,118 @@ async function getActiveModel(): Promise<string | null> {
  * Attempt to switch DiT via /v1/init when available.
  * This Gradio build often 404s /v1/init â€” do NOT hard-fail; boot config_path must match.
  */
+
+function readEngineBootConfig(): string | null {
+  try {
+    const statusPath = path.join(ENGINE_DIR, 'phoenix-engine-status.json');
+    if (!existsSync(statusPath)) return null;
+    const st = JSON.parse(readFileSync(statusPath, 'utf8')) as { config_path?: string };
+    return st?.config_path ? toEngineModelId(String(st.config_path)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeEngineBootConfig(configPath: string, isTurbo: boolean): void {
+  try {
+    const statusPath = path.join(ENGINE_DIR, 'phoenix-engine-status.json');
+    const payload = {
+      config_path: configPath,
+      is_turbo: isTurbo,
+      updated_at: new Date().toLocaleString(),
+    };
+    writeFileSync(statusPath, JSON.stringify(payload));
+  } catch (e) {
+    console.warn('[Model] failed to write phoenix-engine-status.json', e);
+  }
+}
+
+/** Restart Phoenix Engine with --config_path matching the Quality chip (boot-only DiT select). */
+export async function ensureEngineBootConfig(ditModel: string): Promise<{ restarted: boolean; configPath: string }> {
+  const wanted = toEngineModelId(ditModel);
+  const phoenixId = toPhoenixModelId(wanted);
+  const boot = readEngineBootConfig();
+  if (boot === wanted) {
+    lastRequestedDitModel = wanted;
+    return { restarted: false, configPath: phoenixId };
+  }
+
+  if (!isCheckpointOnDisk(wanted)) {
+    throw new Error(
+      `Phoenix DiT checkpoint '${phoenixId}' is not on disk under ${ENGINE_DIR}/checkpoints. ` +
+      `Download it, then retry.`,
+    );
+  }
+
+  console.log(`[Model] Boot DiT mismatch (status=${boot ?? 'none'}, wanted=${wanted}) — restarting Phoenix Engine...`);
+
+  try {
+    const out = execSync('netstat -ano', { encoding: 'utf-8' });
+    const pids = new Set<string>();
+    for (const line of out.split(/\r?\n/)) {
+      if (!/LISTENING/i.test(line)) continue;
+      if (!/:8001\s/.test(line)) continue;
+      const parts = line.trim().split(/\s+/);
+      const pid = parts[parts.length - 1];
+      if (pid && /^\d+$/.test(pid)) pids.add(pid);
+    }
+    for (const pid of pids) {
+      try { execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore' }); } catch { /* ignore */ }
+    }
+  } catch (e) {
+    console.warn('[Model] netstat/taskkill failed', e);
+  }
+
+  await new Promise((r) => setTimeout(r, 2000));
+
+  const launcher = process.env.PHOENIX_ENGINE_LAUNCHER || 'C:\\Users\\orchi\\launch_phoenix_engine_noquant.py';
+  const python = resolvePythonPath(ENGINE_DIR);
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    ACESTEP_CONFIG_PATH: phoenixId,
+    PHOENIX_ENGINE_CONFIG_PATH: phoenixId,
+    ACESTEP_FORCE_LM_4B: 'true',
+    ACESTEP_OFFLOAD_TO_CPU: 'true',
+    ACESTEP_OFFLOAD_DIT_TO_CPU: 'true',
+  };
+  const tryIds = [phoenixId, toEngineModelId(phoenixId), toPhoenixModelId(phoenixId)];
+  for (const id of tryIds) {
+    if (existsSync(path.join(ENGINE_DIR, 'checkpoints', id))) {
+      env.ACESTEP_CONFIG_PATH = id;
+      env.PHOENIX_ENGINE_CONFIG_PATH = id;
+      break;
+    }
+  }
+
+  spawn(python, [launcher], {
+    cwd: ENGINE_DIR,
+    env,
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  }).unref();
+
+  writeEngineBootConfig(String(env.ACESTEP_CONFIG_PATH), /turbo/i.test(String(env.ACESTEP_CONFIG_PATH)));
+
+  const deadline = Date.now() + 240_000;
+  let ready = false;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${ENGINE_API}/config`);
+      if (res.ok) { ready = true; break; }
+    } catch { /* retry */ }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  if (!ready) {
+    throw new Error(`Phoenix Engine did not become ready after restart for ${phoenixId}`);
+  }
+
+  resetGradioClient();
+  lastRequestedDitModel = wanted;
+  console.log(`[Model] Phoenix Engine ready with boot config ${env.ACESTEP_CONFIG_PATH}`);
+  return { restarted: true, configPath: toPhoenixModelId(String(env.ACESTEP_CONFIG_PATH)) };
+}
+
 async function switchModelIfNeeded(ditModel: string): Promise<void> {
   ditModel = toEngineModelId(ditModel);
   const activeModel = await getActiveModel();
@@ -714,12 +839,15 @@ async function switchModelIfNeeded(ditModel: string): Promise<void> {
     }
 
     if (res.status === 404) {
-      // Gradio portable build: no runtime /v1/init. Rely on process boot --config_path.
-      lastRequestedDitModel = ditModel;
-      console.warn(
-        `[Model] /v1/init not available (404). Assuming engine was started with --config_path matching '${ditModel}'. ` +
-          `If generation still clamps steps to 8, restart Phoenix Engine with --config_path ${ditModel}.`,
-      );
+      // Gradio portable build: no runtime /v1/init — restart with matching --config_path when needed.
+      const boot = readEngineBootConfig();
+      if (boot && boot === ditModel) {
+        lastRequestedDitModel = ditModel;
+        console.log(`[Model] /v1/init 404 but boot status already '${ditModel}'`);
+        return;
+      }
+      console.warn(`[Model] /v1/init 404; ensuring boot config_path=${ditModel}`);
+      await ensureEngineBootConfig(ditModel);
       return;
     }
 

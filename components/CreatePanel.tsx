@@ -200,7 +200,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     vocalGender: 'male',
     bpm: 120,
     keyScale: '',
-    timeSignature: '4/4',
+    timeSignature: '4',
     showAdvanced: true,
     duration: 234,
     guidanceScale: 10.5,
@@ -461,7 +461,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   // Music Parameters
   const [bpm, setBpm] = useState(cs('bpm', 120));
   const [keyScale, setKeyScale] = useState(cs('keyScale', ''));
-  const [timeSignature, setTimeSignature] = useState(cs('timeSignature', '4/4'));
+  const [timeSignature, setTimeSignature] = useState(cs('timeSignature', '4'));
 
   // Advanced Settings
   const [showAdvanced, setShowAdvanced] = useState(cs('showAdvanced', true));
@@ -608,30 +608,64 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     const bestLm = pickBestPreloadedLm(preloadedLm, DEFAULT_PHOENIX_LM_MODEL);
 
     if (preset === 'fast') {
-      // Turbo chip
+      // Turbo chip — donor Gradio turbo: steps 8, shift 3.0, ode
       persistModel(bestTurbo);
       setInferenceSteps(8);
       setInferMethod('ode');
-      setShift(1.0);
+      setShift(3.0);
       setUseAdg(false);
     } else if (preset === 'quality') {
-      // Standard chip (middle: Base) — donor: ode + shift 3.0, 100 steps
+      // Standard chip — Base DiT, multi-step; SDE+shift1 known-good family with PMM Create
       persistModel(bestStandard);
       setInferenceSteps(100);
-      setInferMethod('ode');
-      setShift(3.0);
+      setInferMethod('sde');
+      setShift(1.0);
       setUseAdg(false);
     } else {
-      // Premium chip (SFT) — donor: ode + shift 3.0, 200 steps
+      // Premium — SFT + LoRA v5 known-good: 100 | sde | shift 1 | cover_noise 0
       persistModel(bestPremium);
-      setInferenceSteps(200);
-      setInferMethod('ode');
-      setShift(3.0);
+      setInferenceSteps(100);
+      setInferMethod('sde');
+      setShift(1.0);
       setUseAdg(false);
     }
     setLmModel(bestLm);
     lsSet(storageKeys.lmModel.primary, bestLm, storageKeys.lmModel.legacy);
-  }, [fetchedModels, fetchedLmModels, persistModel]);
+    // Boot DiT is selected only via engine --config_path; hot /v1/init is unavailable.
+    const targetDit = preset === 'fast' ? bestTurbo : preset === 'quality' ? bestStandard : bestPremium;
+    if (token) {
+      void (async () => {
+        try {
+          const res = await fetch('/api/generate/ensure-dit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ditModel: targetDit }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            console.warn('[CreatePanel] ensure-dit failed', data);
+            return;
+          }
+          if (data?.restarted) {
+            console.log('[CreatePanel] Phoenix Engine restarted for', targetDit, '— reloading LoRA');
+            try {
+              if (loraPath.trim()) {
+                await generateApi.loadLora({ lora_path: loraPath }, token);
+                if (loraScale !== 1) await generateApi.setLoraScale({ scale: loraScale }, token);
+                if (!loraEnabled) await generateApi.toggleLora({ enabled: false }, token);
+                setLoraLoaded(true);
+              }
+            } catch (e) {
+              console.warn('[CreatePanel] LoRA reload after DiT restart failed', e);
+            }
+          }
+        } catch (e) {
+          console.warn('[CreatePanel] ensure-dit error', e);
+        }
+      })();
+    }
+
+  }, [fetchedModels, fetchedLmModels, persistModel, token, loraPath, loraScale, loraEnabled]);
 
 
   // Fallback model list when backend is unavailable
@@ -2399,30 +2433,34 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
         {/* COMMON SETTINGS */}
         <div className="space-y-4">
-          {/* Quality presets: Fast / Quality / Max (pairs DiT model + steps + method/shift) */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Quality</span>
-            {(
-              [
-                { id: 'fast' as const, label: 'Turbo', hint: 'Turbo | 8 | ode' },
-                { id: 'quality' as const, label: 'Standard', hint: 'Base | 100 | ode | shift3' },
-                { id: 'max' as const, label: 'Premium', hint: 'SFT | 200 | ode | shift3' },
-              ]
-            ).map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                title={preset.hint}
-                onClick={() => applyQualityPreset(preset.id)}
-                className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors border ${
-                  qualityPreset === preset.id
-                    ? 'bg-emerald-600 text-white border-emerald-500'
-                    : 'bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-zinc-200 dark:border-white/5'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
+          {/* Quality presets — boxed like LoRA / Title */}
+          <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="uppercase tracking-wide text-xs font-bold text-[#2F5D3A] dark:text-[#7CB98A]">Quality</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {(
+                [
+                  { id: 'fast' as const, label: 'Turbo', hint: 'Turbo DiT | 8 | ode | shift 3' },
+                  { id: 'quality' as const, label: 'Standard', hint: 'Base DiT | 100 | sde | shift 1' },
+                  { id: 'max' as const, label: 'Premium', hint: 'SFT DiT | 100 | sde | shift 1' },
+                ]
+              ).map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  title={preset.hint}
+                  onClick={() => applyQualityPreset(preset.id)}
+                  className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors border ${
+                    qualityPreset === preset.id
+                      ? 'bg-emerald-600 text-white border-emerald-500'
+                      : 'bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-zinc-200 dark:border-white/5'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
           </div>
           {/* Instrumental Toggle (Simple Mode) */}
           {!customMode && (
