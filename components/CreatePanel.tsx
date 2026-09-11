@@ -608,6 +608,8 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     const bestLm = pickBestPreloadedLm(preloadedLm, DEFAULT_PHOENIX_LM_MODEL);
 
     if (preset === 'fast') {
+      // Unload LoRA for turbo chip — SFT adapter must not ride Turbo DiT
+      void (async () => { try { if (token) { await generateApi.unloadLora(token); setLoraLoaded(false); } } catch { /* ignore */ } })();
       // Turbo chip — donor Gradio turbo: steps 8, shift 3.0, ode
       persistModel(bestTurbo);
       setInferenceSteps(8);
@@ -867,10 +869,12 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
 
   // Auto-load LoRA on mount so hard refresh doesn't leave the wrong/unloaded adapter
+  // Never auto-load on Turbo DiT — SFT LoRA v5 is incompatible (noise FAIL).
   useEffect(() => {
     if (!token) return;
     if (!loraPath.trim()) return;
     if (loraLoaded || isLoraLoading) return;
+    if (qualityPreset === 'fast' || isTurboModel(selectedModel)) return;
     let cancelled = false;
     (async () => {
       setIsLoraLoading(true);
