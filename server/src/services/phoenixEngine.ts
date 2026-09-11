@@ -1,4 +1,4 @@
-﻿import { writeFile, mkdir, copyFile, rm, readFile, appendFile } from 'fs/promises';
+import { writeFile, mkdir, copyFile, rm, readFile, appendFile } from 'fs/promises';
 import { spawn, execSync } from 'child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
@@ -638,11 +638,11 @@ function gradioPredictTimeoutMs(params: GenerationParams): number {
   const duration = Number(params.duration) || 120;
   const steps = Number(params.inferenceSteps) || 8;
   const turbo = !!(params.ditModel && /turbo/i.test(params.ditModel));
-  // Turbo: real UI Create ~3–4min (gigs3-5 ~207s). Align with STALL_MS 360s.
+  // Turbo Create wall-clock outer ~20–30s (Brand CLEAR).
   // Quality / non-turbo keeps the longer budget.
   if (turbo) {
-    // Match real Turbo walls (~207s gigs3-5) + STALL_MS 360s — 20–30s false-fails working path
-    return Math.min(600_000, Math.max(360_000, 360_000 + Math.max(0, duration - 120) * 1000 + steps * 2000));
+    // Outer 20–30s; STALL_MS turbo 25s
+    return Math.min(30_000, Math.max(20_000, 20_000 + Math.max(0, duration - 30) * 50));
   }
   const base = 180_000;
   return Math.min(1_200_000, Math.max(base, base + duration * 2000 + steps * 5000));
@@ -1516,7 +1516,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
   }
 
   // Hung after pre-predict with no completion Ã¢â‚¬â€ fail + hardClose (pillar C stall)
-  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 360_000 : 180_000;
+  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 25_000 : 180_000;
   if (
     (job.status === 'running' || job.status === 'queued') &&
     job.prePredictAt &&
