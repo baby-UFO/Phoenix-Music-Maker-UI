@@ -585,11 +585,11 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     try { localStorage.setItem('ace-create-qualityPreset', preset); } catch { /* ignore */ }
 
     const preloadedDit = fetchedModels.filter((m) => m.is_preloaded).map((m) => toPhoenixModelId(m.name));
-    // Full Monty: Quality + Max use Phoenix XL SFT when on disk; Fast uses Phoenix V15 Base (never turbo).
-    const bestMax = preloadedDit.includes('phoenix-v15-xl-sft')
-      ? 'phoenix-v15-xl-sft'
-      : pickBestPreloadedDit(preloadedDit, DEFAULT_PHOENIX_DIT_MODEL);
-    const bestQuality = bestMax; // same DiT family â€” steps differ
+    // Quality + Max prefer Phoenix V15 SFT (LoRA v5 is SFT 2048); Fast uses Base (never turbo/XL).
+    const bestMax = preloadedDit.includes('phoenix-v15-sft')
+      ? 'phoenix-v15-sft'
+      : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-sft');
+    const bestQuality = bestMax; // same DiT family - steps differ
     const bestFast =
       preloadedDit.includes('phoenix-v15-base') ? 'phoenix-v15-base'
       : pickBestPreloadedDit(preloadedDit, 'phoenix-v15-base');
@@ -601,19 +601,19 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     if (preset === 'fast') {
       persistModel(bestFast);
       setInferenceSteps(50);
-      setInferMethod('ode');
+      setInferMethod('sde');
       setShift(1.0);
       setUseAdg(false);
     } else if (preset === 'quality') {
       persistModel(bestQuality);
       setInferenceSteps(100);
-      setInferMethod('ode');
+      setInferMethod('sde');
       setShift(1.0);
       setUseAdg(false);
     } else {
       persistModel(bestMax);
       setInferenceSteps(200);
-      setInferMethod('ode');
+      setInferMethod('sde');
       setShift(1.0);
       setUseAdg(false);
     }
@@ -2349,31 +2349,6 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                     </button>
                   ))}
                 </div>
-                {/* Quality presets: Fast / Quality / Max (pairs DiT model + steps + method/shift) */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Quality</span>
-                  {(
-                    [
-                      { id: 'fast' as const, label: 'Fast', hint: 'Phoenix V15 Turbo | 8 | ode' },
-                      { id: 'quality' as const, label: 'Quality', hint: 'Phoenix V15 Base | 100 | sde' },
-                      { id: 'max' as const, label: 'Max', hint: 'Phoenix V15 SFT/Base | 200 | sde' },
-                    ]
-                  ).map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      title={preset.hint}
-                      onClick={() => applyQualityPreset(preset.id)}
-                      className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors border ${
-                        qualityPreset === preset.id
-                          ? 'bg-emerald-600 text-white border-emerald-500'
-                          : 'bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-zinc-200 dark:border-white/5'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
                 {/* Quick Tags */}
                 <div className="flex flex-wrap gap-2">
                   {musicTags.map(tag => (
@@ -2407,6 +2382,31 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
 
         {/* COMMON SETTINGS */}
         <div className="space-y-4">
+          {/* Quality presets: Fast / Quality / Max (pairs DiT model + steps + method/shift) */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Quality</span>
+            {(
+              [
+                { id: 'fast' as const, label: 'Fast', hint: 'Phoenix V15 Base | 50 | sde' },
+                { id: 'quality' as const, label: 'Quality', hint: 'Phoenix V15 SFT | 100 | sde' },
+                { id: 'max' as const, label: 'Max', hint: 'Phoenix V15 SFT | 200 | sde' },
+              ]
+            ).map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                title={preset.hint}
+                onClick={() => applyQualityPreset(preset.id)}
+                className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-colors border ${
+                  qualityPreset === preset.id
+                    ? 'bg-emerald-600 text-white border-emerald-500'
+                    : 'bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-zinc-200 dark:border-white/5'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
           {/* Instrumental Toggle (Simple Mode) */}
           {!customMode && (
             <div className="flex items-center justify-between px-1 py-2">
