@@ -639,11 +639,10 @@ function gradioPredictTimeoutMs(params: GenerationParams): number {
   const duration = Number(params.duration) || 120;
   const steps = Number(params.inferenceSteps) || 8;
   const turbo = !!(params.ditModel && /turbo/i.test(params.ditModel));
-  // Turbo: ≥360s outer budget (historical good turbo ~199s for dur~234; 120s was false-failing).
-  // Non-turbo: base 3min, clamp →20 min.
+  // Turbo Create wall-clock is ~8–15s (outer ~20–30s). Do NOT babysit hung turbo for minutes.
+  // Quality / non-turbo keeps the longer budget.
   if (turbo) {
-    const turboMs = Math.min(600_000, Math.max(360_000, 360_000 + Math.max(0, duration - 120) * 1000 + steps * 2000));
-    return turboMs;
+    return Math.min(30_000, Math.max(20_000, 20_000 + Math.max(0, duration - 30) * 50));
   }
   const base = 180_000;
   return Math.min(1_200_000, Math.max(base, base + duration * 2000 + steps * 5000));
@@ -1519,7 +1518,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
   }
 
   // Hung after pre-predict with no completion — fail + hardClose (pillar C stall)
-  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 360_000 : 180_000;
+  const STALL_MS = (job.params?.ditModel && /turbo/i.test(String(job.params.ditModel))) ? 25_000 : 180_000;
   if (
     (job.status === 'running' || job.status === 'queued') &&
     job.prePredictAt &&
