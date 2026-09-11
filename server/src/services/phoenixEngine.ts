@@ -164,7 +164,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     if (wantsRapLocal && useVocal.length > 1) {
       const rapParts = useVocal.filter((p) => RAP_DELIVERY_RE.test(p));
       const timbreParts = useVocal.filter((p) => !RAP_DELIVERY_RE.test(p));
-      useVocal = [...rapParts, ...timbreParts];
+      useVocal = [...timbreParts, ...rapParts]; // JEJ/basso before delivery clauses
     }
     const seen = new Set<string>();
     const out: string[] = [];
@@ -224,7 +224,8 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     const otherParts = parts.filter((p) => !TIMBRE_RE.test(p));
     const seen = new Set<string>();
     const ordered: string[] = [];
-    for (const p of [...rapLead, ...timbreParts, ...otherParts]) {
+    // Timbre (JEJ/basso) before long RAP delivery list — depth was getting ignored when buried last
+    for (const p of [...timbreParts, ...rapLead, ...otherParts]) {
       const k = p.toLowerCase();
       if (seen.has(k)) continue;
       seen.add(k);
