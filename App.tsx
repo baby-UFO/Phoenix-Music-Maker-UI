@@ -8,7 +8,6 @@ import { LibraryView } from './components/LibraryView';
 import { CreatePlaylistModal, AddToPlaylistModal } from './components/PlaylistModals';
 import { VideoGeneratorModal } from './components/VideoGeneratorModal';
 import { MasterTrackModal } from './components/MasterTrackModal';
-import { UsernameModal } from './components/UsernameModal';
 import { UserProfile } from './components/UserProfile';
 import { SettingsModal } from './components/SettingsModal';
 import { SongProfile } from './components/SongProfile';
@@ -34,8 +33,7 @@ function AppContent() {
   const { isMobile, isDesktop } = useResponsive();
 
   // Auth
-  const { user, token, isAuthenticated, isLoading: authLoading, setupUser, logout } = useAuth();
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const { user, token, isLoading: authLoading } = useAuth();
   // Track multiple concurrent generation jobs
   const activeJobsRef = useRef<Map<string, { tempId: string; pollInterval: ReturnType<typeof setInterval> }>>(new Map());
   /** Durable generating placeholders — survives loadSongs/refresh merges. */
@@ -325,8 +323,7 @@ function AppContent() {
     setToast(prev => ({ ...prev, isVisible: false }));
   };
 
-  // Show username modal if not authenticated and not loading
-  // Zero-auth: never open UsernameModal as a boot gate
+  // Zero-auth: no UsernameModal boot gate
 
   // Load Playlists
   useEffect(() => {
@@ -475,7 +472,7 @@ function AppContent() {
 
   // Load Songs Effect
   useEffect(() => {
-    if (!isAuthenticated || !token) return;
+    if (authLoading) return;
 
     const loadSongs = async () => {
       try {
@@ -532,10 +529,10 @@ function AppContent() {
     };
 
     loadSongs();
-  }, [isAuthenticated, token]);
+  }, [authLoading, token]);
 
   const loadReferenceTracks = useCallback(async () => {
-    if (!isAuthenticated || !token) return;
+    if (authLoading) return;
     try {
       const response = await fetch('/api/reference-tracks', {
         headers: { Authorization: `Bearer ${token}` }
@@ -546,7 +543,7 @@ function AppContent() {
     } catch (error) {
       console.error('Failed to load reference tracks:', error);
     }
-  }, [isAuthenticated, token]);
+  }, [authLoading, token]);
 
   // Load reference tracks for Library
   useEffect(() => {
@@ -1198,7 +1195,7 @@ function AppContent() {
     resumeJobs();
     const hydrateTimer = setInterval(() => { resumeJobs(); }, 4500);
     return () => clearInterval(hydrateTimer);
-  }, [isAuthenticated, token, beginPollingJob]);
+  }, [authLoading, token, beginPollingJob]);
 
   const togglePlay = () => {
     if (!currentSong) return;
@@ -1518,14 +1515,7 @@ function AppContent() {
     setSongForMaster(song);
     setIsMasterModalOpen(true);
   };
-
-  // Handle username setup
-  const handleUsernameSubmit = async (username: string) => {
-    await setupUser(username);
-    setShowUsernameModal(false);
-  };
-
-  // Render Layout Logic
+// Render Layout Logic
   const renderContent = () => {
     switch (currentView) {
       case 'library': {
@@ -1837,11 +1827,7 @@ function AppContent() {
         song={songForMaster}
         onClose={() => { setIsMasterModalOpen(false); setSongForMaster(null); }}
       />
-      <UsernameModal
-        isOpen={false}
-        onSubmit={handleUsernameSubmit}
-      />
-      <SettingsModal
+<SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
         theme={theme}
