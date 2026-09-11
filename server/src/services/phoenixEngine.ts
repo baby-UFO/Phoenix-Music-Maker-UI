@@ -740,6 +740,18 @@ export async function ensureEngineBootConfig(ditModel: string): Promise<{ restar
 
   console.log(`[Model] Boot DiT mismatch (status=${boot ?? 'none'}, wanted=${wanted}) — restarting Phoenix Engine...`);
 
+  // Engine kill orphans any in-flight Gradio predict and used to wedge isProcessingQueue forever.
+  for (const [, job] of activeJobs) {
+    if (job.status === 'running' || job.status === 'queued') {
+      job.cancelled = true;
+      job.status = 'failed';
+      job.error = 'Phoenix Engine restarted (ensure-dit); generation interrupted';
+      job.stage = 'Failed';
+    }
+  }
+  jobQueue.length = 0;
+  resetGradioClient();
+
   try {
     const out = execSync('netstat -ano', { encoding: 'utf-8' });
     const pids = new Set<string>();
@@ -878,38 +890,82 @@ export function resetClient(): void {
 // Job queue
 // ---------------------------------------------------------------------------
 
+
+function gradioPredictTimeoutMs(params: GenerationParams): number {
+  // Turbo ~8-step gens can still take minutes on long tracks; never block the Node queue forever.
+  const envMs = Number(process.env.PHOENIX_GRADIO_PREDICT_TIMEOUT_MS);
+  if (Number.isFinite(envMs) && envMs >= 60_000) return envMs;
+  const durationSec = Math.max(0, Number(params.duration) || 0);
+  const steps = Math.max(1, Number(params.inferenceSteps) || 8);
+  // Heuristic: ~2.5s/step + duration + 3min slack, clamped 6–20 min
+  const estimate = Math.round(steps * 2500 + durationSec * 1000 + 180_000);
+  return Math.min(1_200_000, Math.max(360_000, estimate));
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`));
+        }, ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function processQueue(): Promise<void> {
   if (isProcessingQueue) return;
   isProcessingQueue = true;
 
-  while (jobQueue.length > 0) {
-    const jobId = jobQueue[0];
-    const job = activeJobs.get(jobId);
+  try {
+    while (jobQueue.length > 0) {
+      const jobId = jobQueue[0];
+      const job = activeJobs.get(jobId);
 
-    if (job && job.cancelled) {
-      job.status = 'failed';
-      job.error = 'Cancelled';
-    } else if (job && job.status === 'queued') {
-      try {
-        await processGeneration(jobId, job.params, job);
-      } catch (error) {
-        console.error(`Queue processing error for ${jobId}:`, error);
+      if (job && job.cancelled) {
+        job.status = 'failed';
+        job.error = 'Cancelled';
+      } else if (job && job.status === 'queued') {
+        try {
+          await processGeneration(jobId, job.params, job);
+        } catch (error) {
+          console.error(`Queue processing error for ${jobId}:`, error);
+          if (job.status === 'queued' || job.status === 'running') {
+            job.status = 'failed';
+            job.error = error instanceof Error ? error.message : 'Queue processing failed';
+            job.stage = 'Failed';
+          }
+        }
+      } else if (job && job.status === 'running') {
+        // Defensive: head job stuck in running without an await owner (e.g. after crash/restart)
+        console.warn(`Queue: dropping stale running head ${jobId}`);
+        job.status = 'failed';
+        job.error = job.error || 'Stale running job dropped from queue';
       }
+
+      // Remove THIS job only — never blind-shift (ensure-dit may have cleared + re-queued others)
+      const qIdx = jobQueue.indexOf(jobId);
+      if (qIdx >= 0) jobQueue.splice(qIdx, 1);
+
+      // Update queue positions for remaining jobs
+      jobQueue.forEach((id, index) => {
+        const queuedJob = activeJobs.get(id);
+        if (queuedJob) {
+          queuedJob.queuePosition = index + 1;
+        }
+      });
     }
-
-    // Remove from queue after processing (whether success or failure)
-    jobQueue.shift();
-
-    // Update queue positions for remaining jobs
-    jobQueue.forEach((id, index) => {
-      const queuedJob = activeJobs.get(id);
-      if (queuedJob) {
-        queuedJob.queuePosition = index + 1;
-      }
-    });
+  } finally {
+    isProcessingQueue = false;
+    if (jobQueue.length > 0) {
+      processQueue().catch(err => console.error('Queue processing error:', err));
+    }
   }
-
-  isProcessingQueue = false;
 }
 
 // Submit generation job to queue
@@ -1041,8 +1097,26 @@ async function processGenerationViaGradio(
 
   job.stage = 'Generating music via Gradio...';
 
-  // predict() blocks until generation is complete
-  const result = await client.predict('/generation_wrapper', args);
+  // predict() blocks until generation is complete — MUST time out or a hung
+  // Gradio socket (e.g. ensure-dit kill mid-flight) permanently stalls processQueue.
+  const predictMs = gradioPredictTimeoutMs(params);
+  console.log(`Job ${jobId}: Gradio predict timeout budget ${Math.round(predictMs / 1000)}s`);
+  let result;
+  try {
+    result = await withTimeout(
+      client.predict('/generation_wrapper', args),
+      predictMs,
+      `Gradio predict ${jobId}`,
+    );
+  } catch (error) {
+    resetGradioClient();
+    throw error;
+  }
+  if (job.cancelled) {
+    job.status = 'failed';
+    job.error = 'Cancelled';
+    return;
+  }
   const data = result.data as unknown[];
 
   if (!Array.isArray(data) || data.length === 0) {
@@ -1522,6 +1596,7 @@ export async function downloadAudioToBuffer(remoteUrl: string): Promise<{ buffer
 export function cancelEngineJob(jobId: string): boolean {
   const job = activeJobs.get(jobId);
   if (!job) return false;
+  const wasRunning = job.status === 'running';
   job.cancelled = true;
   if (job.status === 'queued' || job.status === 'running') {
     job.status = 'failed';
@@ -1533,6 +1608,10 @@ export function cancelEngineJob(jobId: string): boolean {
     const queuedJob = activeJobs.get(id);
     if (queuedJob) queuedJob.queuePosition = index + 1;
   });
+  // Drop cached Gradio client so a hung predict is more likely to reject and free processQueue.
+  if (wasRunning) {
+    resetGradioClient();
+  }
   return true;
 }
 
