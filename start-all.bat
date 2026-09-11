@@ -73,6 +73,7 @@ if "%ACESTEP_LM_MODEL_PATH%"=="" (
 )
 if "%ACESTEP_OFFLOAD_TO_CPU%"=="" set "ACESTEP_OFFLOAD_TO_CPU=true"
 if "%ACESTEP_OFFLOAD_DIT_TO_CPU%"=="" set "ACESTEP_OFFLOAD_DIT_TO_CPU=true"
+if "%ACESTEP_FORCE_LM_4B%"=="" set "ACESTEP_FORCE_LM_4B=true"
 )
 
 REM Detect Phoenix Engine installation type
@@ -100,7 +101,7 @@ echo.
 
 REM Start Phoenix Engine API in new window
 echo [1/3] Starting Phoenix Engine API server...
-start "Phoenix Engine API" cmd /k "cd /d "%ACESTEP_PATH%" && set ACESTEP_CONFIG_PATH=!ACESTEP_CONFIG_PATH! && !API_COMMAND!"
+start "Phoenix Engine API" cmd /k "cd /d "%ACESTEP_PATH%" && set ACESTEP_CONFIG_PATH=!ACESTEP_CONFIG_PATH! && set ACESTEP_FORCE_LM_4B=!ACESTEP_FORCE_LM_4B! && set ACESTEP_LM_MODEL_PATH=!ACESTEP_LM_MODEL_PATH! && !API_COMMAND!"
 
 REM Wait for API to start
 echo Waiting for API to initialize...
