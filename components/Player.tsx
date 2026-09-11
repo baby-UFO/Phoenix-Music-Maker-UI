@@ -30,6 +30,7 @@ interface PlayerProps {
     onToggleLike: () => void;
     onNavigateToSong?: (songId: string) => void;
     onOpenVideo?: () => void;
+    onOpenMaster?: () => void;
     onReusePrompt?: () => void;
     onAddToPlaylist?: () => void;
     onDelete?: () => void;
@@ -57,7 +58,7 @@ export const Player: React.FC<PlayerProps> = ({
     isLiked,
     onToggleLike,
     onNavigateToSong,
-    onOpenVideo,
+    onOpenVideo, onOpenMaster,
     onReusePrompt,
     onAddToPlaylist,
     onDelete,
@@ -321,6 +322,7 @@ export const Player: React.FC<PlayerProps> = ({
                                 position="center"
                                 direction="up"
                                 onCreateVideo={onOpenVideo}
+                                                                onMasterTrack={onOpenMaster}
                                 onReusePrompt={onReusePrompt}
                                 onAddToPlaylist={onAddToPlaylist}
                                 onDelete={onDelete}
@@ -609,6 +611,7 @@ export const Player: React.FC<PlayerProps> = ({
                                             position="center"
                                             direction="up"
                                             onCreateVideo={onOpenVideo}
+                                                                onMasterTrack={onOpenMaster}
                                             onReusePrompt={onReusePrompt}
                                             onAddToPlaylist={onAddToPlaylist}
                                             onDelete={onDelete}
@@ -813,6 +816,7 @@ export const Player: React.FC<PlayerProps> = ({
                             position="right"
                             direction="up"
                             onCreateVideo={onOpenVideo}
+                                                                onMasterTrack={onOpenMaster}
                             onReusePrompt={onReusePrompt}
                             onAddToPlaylist={onAddToPlaylist}
                             onDelete={onDelete}

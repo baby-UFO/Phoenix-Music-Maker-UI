@@ -9,7 +9,8 @@ import {
     Repeat,
     ListPlus,
     Download,
-    Trash2
+    Trash2,
+    Sliders
 } from 'lucide-react';
 
 interface SongDropdownMenuProps {
@@ -28,6 +29,7 @@ interface SongDropdownMenuProps {
     onDelete?: () => void;
     onUseAsReference?: () => void;
     onCoverSong?: () => void;
+    onMasterTrack?: () => void;
 }
 
 interface MenuItemProps {
@@ -73,7 +75,8 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
     onDownload,
     onDelete,
     onUseAsReference,
-    onCoverSong
+    onCoverSong,
+    onMasterTrack
 }) => {
     const { t } = useI18n();
     const menuRef = useRef<HTMLDivElement>(null);
@@ -169,6 +172,12 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
                 icon={<Video size={14} />}
                 label={t('createVideo')}
                 onClick={() => handleAction(onCreateVideo)}
+            />
+            <MenuItem
+                icon={<Sliders size={14} />}
+                label={t('masterThisTrack')}
+                onClick={() => handleAction(onMasterTrack)}
+                disabled={!song.audioUrl || !onMasterTrack}
             />
             {isOwner && (
                 <MenuItem

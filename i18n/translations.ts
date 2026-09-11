@@ -461,6 +461,11 @@ export const translations = {
     
     // Song Dropdown Menu
     createVideo: 'Create Video',
+    masterThisTrack: 'Master this track',
+    renderMaster: 'Render master',
+    masterRendering: 'Rendering master…',
+    masterDone: 'Master ready',
+    referenceMatchOptional: 'Reference match (optional)',
     editAudio: 'Edit Audio',
     extractStems: 'Extract Stems',
     reusePrompt: 'Reuse Prompt',
@@ -1060,6 +1065,11 @@ export const translations = {
     
     // Song Dropdown Menu
     createVideo: '创建视频',
+    masterThisTrack: 'Master this track',
+    renderMaster: 'Render master',
+    masterRendering: 'Rendering master…',
+    masterDone: 'Master ready',
+    referenceMatchOptional: 'Reference match (optional)',
     editAudio: '编辑音频',
     extractStems: '提取音轨',
     reusePrompt: '重用提示词',
@@ -1659,6 +1669,11 @@ export const translations = {
     
     // Song Dropdown Menu
     createVideo: 'ビデオを作成',
+    masterThisTrack: 'Master this track',
+    renderMaster: 'Render master',
+    masterRendering: 'Rendering master…',
+    masterDone: 'Master ready',
+    referenceMatchOptional: 'Reference match (optional)',
     editAudio: 'オーディオを編集',
     extractStems: 'ステムを抽出',
     reusePrompt: 'プロンプトを再利用',
@@ -2258,6 +2273,11 @@ export const translations = {
     
     // Song Dropdown Menu
     createVideo: '비디오 만들기',
+    masterThisTrack: 'Master this track',
+    renderMaster: 'Render master',
+    masterRendering: 'Rendering master…',
+    masterDone: 'Master ready',
+    referenceMatchOptional: 'Reference match (optional)',
     editAudio: '오디오 편집',
     extractStems: '스템 추출',
     reusePrompt: '프롬프트 재사용',

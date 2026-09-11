@@ -12,6 +12,7 @@ interface RightSidebarProps {
     song: Song | null;
     onClose?: () => void;
     onOpenVideo?: () => void;
+    onOpenMaster?: () => void;
     onReuse?: (song: Song) => void;
     onSongUpdate?: (song: Song) => void;
     onNavigateToProfile?: (username: string) => void;
@@ -25,7 +26,7 @@ interface RightSidebarProps {
     currentSong?: Song | null;
 }
 
-export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpenVideo, onReuse, onSongUpdate, onNavigateToProfile, onNavigateToSong, isLiked, onToggleLike, onDelete, onAddToPlaylist, onPlay, isPlaying, currentSong }) => {
+export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpenVideo, onOpenMaster, onReuse, onSongUpdate, onNavigateToProfile, onNavigateToSong, isLiked, onToggleLike, onDelete, onAddToPlaylist, onPlay, isPlaying, currentSong }) => {
     const { token, user } = useAuth();
     const { t } = useI18n();
     const [showMenu, setShowMenu] = useState(false);
@@ -262,6 +263,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                     onClose={() => setShowMenu(false)}
                                     isOwner={isOwner}
                                     onCreateVideo={onOpenVideo}
+                                                                onMasterTrack={onOpenMaster}
                                     onReusePrompt={() => onReuse?.(song)}
                                     onDelete={() => onDelete?.(song)}
                                     onAddToPlaylist={() => onAddToPlaylist?.(song)}

@@ -16,6 +16,7 @@ interface LibraryViewProps {
   onSelectPlaylist: (playlist: Playlist) => void;
   onAddToPlaylist: (song: Song) => void;
   onOpenVideo?: (song: Song) => void;
+    onOpenMaster?: (song: Song) => void;
   onReusePrompt?: (song: Song) => void;
   onDeleteSong?: (song: Song) => void;
   onDeleteReferenceTrack?: (trackId: string) => void;
@@ -41,7 +42,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     onCreatePlaylist,
     onSelectPlaylist,
     onAddToPlaylist,
-    onOpenVideo,
+    onOpenVideo, onOpenMaster,
     onReusePrompt,
     onDeleteSong,
     onDeleteReferenceTrack,
@@ -148,6 +149,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                         onClose={() => setMenuSong(null)}
                                         isOwner={user ? song.userId === user.id : false}
                                         onCreateVideo={() => onOpenVideo?.(song)}
+                                onMasterTrack={() => onOpenMaster?.(song)}
                                         onReusePrompt={() => onReusePrompt?.(song)}
                                         onAddToPlaylist={() => onAddToPlaylist(song)}
                                         onDelete={() => onDeleteSong?.(song)}
@@ -213,6 +215,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                         onClose={() => setMenuSong(null)}
                                         isOwner={user ? song.userId === user.id : false}
                                         onCreateVideo={() => onOpenVideo?.(song)}
+                                onMasterTrack={() => onOpenMaster?.(song)}
                                         onReusePrompt={() => onReusePrompt?.(song)}
                                         onAddToPlaylist={() => onAddToPlaylist(song)}
                                         onDelete={() => onDeleteSong?.(song)}

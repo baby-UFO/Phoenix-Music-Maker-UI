@@ -88,7 +88,7 @@ export const SongList: React.FC<SongListProps> = ({
     onSelect,
     onToggleLike,
     onAddToPlaylist,
-    onOpenVideo,
+    onOpenVideo, onOpenMaster,
     onShowDetails,
     onNavigateToProfile,
     onReusePrompt,
@@ -368,6 +368,7 @@ export const SongList: React.FC<SongListProps> = ({
                                     onToggleLike={() => onToggleLike(item.song.id)}
                                     onAddToPlaylist={() => onAddToPlaylist(item.song)}
                                     onOpenVideo={() => onOpenVideo && onOpenVideo(item.song)}
+                                    onOpenMaster={() => onOpenMaster && onOpenMaster(item.song)}
                                     onShowDetails={() => onShowDetails && onShowDetails(item.song)}
                                     onNavigateToProfile={onNavigateToProfile}
                                     onReusePrompt={() => onReusePrompt?.(item.song)}
@@ -421,6 +422,7 @@ interface SongItemProps {
     onToggleLike: () => void;
     onAddToPlaylist: () => void;
     onOpenVideo?: () => void;
+    onOpenMaster?: () => void;
     onShowDetails?: () => void;
     onNavigateToProfile?: (username: string) => void;
     onReusePrompt?: () => void;
@@ -444,7 +446,7 @@ const SongItem: React.FC<SongItemProps> = ({
     onToggleSelect,
     onToggleLike,
     onAddToPlaylist,
-    onOpenVideo,
+    onOpenVideo, onOpenMaster,
     onShowDetails,
     onNavigateToProfile,
     onReusePrompt,
@@ -731,6 +733,7 @@ const SongItem: React.FC<SongItemProps> = ({
                                 onClose={() => setShowDropdown(false)}
                                 isOwner={isOwner}
                                 onCreateVideo={() => onOpenVideo?.(song)}
+                                onMasterTrack={onOpenMaster}
                                 onReusePrompt={onReusePrompt ? () => onReusePrompt?.(song) : undefined}
                                 onAddToPlaylist={() => onAddToPlaylist?.(song)}
                                 onDelete={() => onDelete?.(song)}

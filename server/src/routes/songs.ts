@@ -169,6 +169,97 @@ router.get('/:id/download', optionalAuthMiddleware, async (req: AuthenticatedReq
 });
 
 
+
+// Master this track — FFmpeg EQ→acompressor→stereotools→alimiter→2-pass loudnorm
+// Writes *_master.<ext> next to source (never overwrites source). Phoenix Music Maker.
+router.post('/:id/master', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const available = await isFfmpegAvailable();
+    if (!available) {
+      res.status(503).json({ error: 'FFmpeg is not available on this server. Install ffmpeg and restart.' });
+      return;
+    }
+
+    const presetRaw = String(req.body?.preset || 'streaming').toLowerCase();
+    if (!(presetRaw in MASTER_PRESETS)) {
+      res.status(400).json({ error: 'Invalid preset. Use streaming, club, or soft.' });
+      return;
+    }
+    const preset = presetRaw as MasterPresetId;
+
+    const formatRaw = String(req.body?.format || 'wav').toLowerCase();
+    if (!isExportFormat(formatRaw)) {
+      res.status(400).json({ error: 'Invalid format. Use wav, mp3, flac, ogg, or aac.' });
+      return;
+    }
+    const format = formatRaw as ExportFormat;
+
+    const knobs: MasterKnobParams = {};
+    const bodyKnobs = req.body?.knobs || {};
+    for (const key of ['bassDb', 'midDb', 'trebleDb', 'compThreshold', 'compRatio', 'stereoWidth', 'limitLevel'] as const) {
+      if (bodyKnobs[key] !== undefined && bodyKnobs[key] !== null && bodyKnobs[key] !== '') {
+        const n = Number(bodyKnobs[key]);
+        if (!Number.isNaN(n)) (knobs as any)[key] = n;
+      }
+    }
+
+    const result = await pool.query(
+      `SELECT s.audio_url, s.title, s.is_public, s.user_id FROM songs s WHERE s.id = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Song not found' });
+      return;
+    }
+    const song = result.rows[0];
+    if (!song.is_public && (!req.user || req.user.id !== song.user_id)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+    if (!song.audio_url) {
+      res.status(400).json({ error: 'Song has no audio' });
+      return;
+    }
+
+    const mastered = await masterTrack(song.audio_url, { preset, format, knobs });
+
+    res.json({
+      success: true,
+      audioUrl: mastered.publicAudioUrl,
+      filename: mastered.filename,
+      outputPath: mastered.outputPath,
+      format: mastered.format,
+      preset: {
+        id: mastered.preset.id,
+        label: mastered.preset.label,
+        I: mastered.preset.I,
+        TP: mastered.preset.TP,
+        LRA: mastered.preset.LRA,
+        description: mastered.preset.description,
+      },
+      meters: mastered.meters,
+      title: song.title,
+    });
+  } catch (error) {
+    console.error('Master track error:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Master failed' });
+  }
+});
+
+// List master presets (no auth required)
+router.get('/master/presets', (_req, res: Response) => {
+  res.json({
+    presets: Object.values(MASTER_PRESETS).map((p) => ({
+      id: p.id,
+      label: p.label,
+      I: p.I,
+      TP: p.TP,
+      LRA: p.LRA,
+      description: p.description,
+    })),
+  });
+});
+
 // Get user's songs
 router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {

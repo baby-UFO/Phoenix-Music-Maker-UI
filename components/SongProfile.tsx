@@ -16,6 +16,8 @@ interface SongProfileProps {
     likedSongIds?: Set<string>;
     onToggleLike?: (songId: string) => void;
     onDelete?: (song: Song) => void;
+    onOpenVideo?: (song: Song) => void;
+    onOpenMaster?: (song: Song) => void;
 }
 
 const updateMetaTags = (song: Song) => {
@@ -81,7 +83,7 @@ const resetMetaTags = () => {
     updateMeta('meta[name="twitter:image"]', defaultImage);
 };
 
-export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay, onNavigateToProfile, currentSong, isPlaying, likedSongIds = new Set(), onToggleLike, onDelete }) => {
+export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay, onNavigateToProfile, currentSong, isPlaying, likedSongIds = new Set(), onToggleLike, onDelete, onOpenVideo, onOpenMaster }) => {
     const { user, token } = useAuth();
     const { t } = useI18n();
     const [song, setSong] = useState<Song | null>(null);
@@ -293,6 +295,8 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                                         isOwner={user?.id === song.userId}
                                         onReusePrompt={() => {}}
                                         onAddToPlaylist={() => {}}
+                                        onCreateVideo={() => onOpenVideo?.(song)}
+                                        onMasterTrack={() => onOpenMaster?.(song)}
                                         onDelete={() => onDelete?.(song)}
                                                             />
                                 )}

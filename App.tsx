@@ -7,6 +7,7 @@ import { Player } from './components/Player';
 import { LibraryView } from './components/LibraryView';
 import { CreatePlaylistModal, AddToPlaylistModal } from './components/PlaylistModals';
 import { VideoGeneratorModal } from './components/VideoGeneratorModal';
+import { MasterTrackModal } from './components/MasterTrackModal';
 import { UsernameModal } from './components/UsernameModal';
 import { UserProfile } from './components/UserProfile';
 import { SettingsModal } from './components/SettingsModal';
@@ -260,6 +261,10 @@ function AppContent() {
   // Video Modal
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [songForVideo, setSongForVideo] = useState<Song | null>(null);
+
+  // Master Track Modal
+  const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
+  const [songForMaster, setSongForMaster] = useState<Song | null>(null);
 
   // Settings Modal
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -1402,6 +1407,7 @@ function AppContent() {
             onSelectPlaylist={(p) => handleNavigateToPlaylist(p.id)}
             onAddToPlaylist={openAddToPlaylistModal}
             onOpenVideo={openVideoGenerator}
+            onOpenMaster={openMasterTrack}
             onReusePrompt={handleReuse}
             onDeleteSong={handleDeleteSong}
             onDeleteReferenceTrack={handleDeleteReferenceTrack}
@@ -1530,6 +1536,7 @@ function AppContent() {
                 onToggleLike={toggleLike}
                 onAddToPlaylist={openAddToPlaylistModal}
                 onOpenVideo={openVideoGenerator}
+            onOpenMaster={openMasterTrack}
                 onShowDetails={handleShowDetails}
                 onNavigateToProfile={handleNavigateToProfile}
                 onReusePrompt={handleReuse}
@@ -1550,6 +1557,7 @@ function AppContent() {
                   song={selectedSong}
                   onClose={() => setShowRightSidebar(false)}
                   onOpenVideo={() => selectedSong && openVideoGenerator(selectedSong)}
+                  onOpenMaster={() => selectedSong && openMasterTrack(selectedSong)}
                   onReuse={handleReuse}
                   onSongUpdate={handleSongUpdate}
                   onNavigateToProfile={handleNavigateToProfile}
@@ -1656,6 +1664,7 @@ function AppContent() {
         onToggleLike={() => currentSong && toggleLike(currentSong.id)}
         onNavigateToSong={handleNavigateToSong}
         onOpenVideo={() => currentSong && openVideoGenerator(currentSong)}
+        onOpenMaster={() => currentSong && openMasterTrack(currentSong)}
         onReusePrompt={() => currentSong && handleReuse(currentSong)}
         onAddToPlaylist={() => currentSong && openAddToPlaylistModal(currentSong)}
         onDelete={() => currentSong && handleDeleteSong(currentSong)}
@@ -1688,6 +1697,11 @@ function AppContent() {
         onClose={() => setIsVideoModalOpen(false)}
         song={songForVideo}
       />
+      <MasterTrackModal
+        isOpen={isMasterModalOpen}
+        song={songForMaster}
+        onClose={() => { setIsMasterModalOpen(false); setSongForMaster(null); }}
+      />
       <UsernameModal
         isOpen={showUsernameModal}
         onSubmit={handleUsernameSubmit}
@@ -1712,6 +1726,7 @@ function AppContent() {
               song={selectedSong}
               onClose={() => setShowMobileDetails(false)}
               onOpenVideo={() => selectedSong && openVideoGenerator(selectedSong)}
+                  onOpenMaster={() => selectedSong && openMasterTrack(selectedSong)}
               onReuse={handleReuse}
               onSongUpdate={handleSongUpdate}
               onNavigateToProfile={handleNavigateToProfile}
