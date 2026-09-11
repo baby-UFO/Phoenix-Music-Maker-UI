@@ -38,6 +38,8 @@ function AppContent() {
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   // Track multiple concurrent generation jobs
   const activeJobsRef = useRef<Map<string, { tempId: string; pollInterval: ReturnType<typeof setInterval> }>>(new Map());
+  /** Durable generating placeholders — survives loadSongs/refresh merges. */
+  const generatingJobsRef = useRef<Map<string, { tempId: string; params: GenerationParams; createdAt: Date }>>(new Map());
   const [activeJobCount, setActiveJobCount] = useState(0);
 
   // Theme State
@@ -518,11 +520,11 @@ function AppContent() {
         const songsMap = new Map<string, Song>();
         [...mySongs, ...likedSongs].forEach(s => songsMap.set(s.id, s));
 
-        // Preserve any generating songs (temp songs)
+        // Preserve generating placeholders (durable map + in-flight rows)
         setSongs(prev => {
           const generatingSongs = prev.filter(s => s.isGenerating);
           const loadedSongs = Array.from(songsMap.values());
-          return [...generatingSongs, ...loadedSongs];
+          return injectGeneratingPlaceholders([...generatingSongs, ...loadedSongs]);
         });
 
         const likedIds = new Set(likedSongs.map(s => s.id));
@@ -800,6 +802,41 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentSong, songs]);
 
+
+  const songIdForJob = (jobId: string) => `job_${jobId}`;
+
+  const injectGeneratingPlaceholders = useCallback((list: Song[]): Song[] => {
+    const byId = new Map(list.map(s => [s.id, s]));
+    for (const [jobId, meta] of generatingJobsRef.current.entries()) {
+      const jobSongId = songIdForJob(jobId);
+      if (meta.tempId.startsWith('temp_') && byId.has(meta.tempId) && byId.has(jobSongId)) {
+        byId.delete(meta.tempId);
+      }
+      const preferredId = meta.tempId.startsWith('job_') ? meta.tempId : jobSongId;
+      if (!byId.has(jobSongId) && !byId.has(meta.tempId)) {
+        byId.set(preferredId, {
+          id: preferredId,
+          title: meta.params.title || 'Generating...',
+          lyrics: '',
+          style: meta.params.style || meta.params.songDescription || '',
+          coverUrl: 'https://picsum.photos/200/200?blur=10',
+          duration: '--:--',
+          createdAt: meta.createdAt,
+          isGenerating: true,
+          tags: meta.params.customMode ? ['custom'] : ['simple'],
+          isPublic: true,
+        });
+      } else {
+        const id = byId.has(jobSongId) ? jobSongId : meta.tempId;
+        const row = byId.get(id);
+        if (row && !row.isGenerating) {
+          byId.set(id, { ...row, isGenerating: true });
+        }
+      }
+    }
+    return Array.from(byId.values());
+  }, []);
+
   // Helper to cleanup a job and check if all jobs are done
   const cleanupJob = useCallback((jobId: string, tempId: string) => {
     const jobData = activeJobsRef.current.get(jobId);
@@ -807,9 +844,10 @@ function AppContent() {
       clearInterval(jobData.pollInterval);
       activeJobsRef.current.delete(jobId);
     }
+    generatingJobsRef.current.delete(jobId);
 
-    // Remove temp song
-    setSongs(prev => prev.filter(s => s.id !== tempId));
+    // Remove temp/job placeholder song(s)
+    setSongs(prev => prev.filter(s => s.id !== tempId && s.id !== songIdForJob(jobId)));
 
     // Update active job count
     setActiveJobCount(activeJobsRef.current.size);
@@ -851,7 +889,7 @@ function AppContent() {
         })(),
       }));
 
-      // Preserve any generating songs that aren't in the loaded list
+      // Preserve generating placeholders that aren't in the loaded list
       setSongs(prev => {
         const generatingSongs = prev.filter(s => s.isGenerating);
         const mergedSongs = [...generatingSongs];
@@ -860,8 +898,7 @@ function AppContent() {
             mergedSongs.push(song);
           }
         }
-        // Sort by creation date, newest first
-        return mergedSongs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return injectGeneratingPlaceholders(mergedSongs).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       });
 
       // If the current selection was a temp/generating song, replace it with newest real song
@@ -878,44 +915,71 @@ function AppContent() {
     if (!token) return;
     if (activeJobsRef.current.has(jobId)) return;
 
+    let pollErrors = 0;
     const pollInterval = setInterval(async () => {
       try {
         const status = await generateApi.getStatus(jobId, token);
+        pollErrors = 0;
         const normalizedProgress = Number.isFinite(Number(status.progress))
           ? (Number(status.progress) > 1 ? Number(status.progress) / 100 : Number(status.progress))
           : undefined;
 
+        const track = generatingJobsRef.current.get(jobId);
+        const rowId = track?.tempId || tempId;
+
         setSongs(prev => {
-          const song = prev.find(s => s.id === tempId);
-          if (!song) return prev;
+          let list = prev;
+          let song = list.find(s => s.id === rowId || s.id === songIdForJob(jobId) || s.id === tempId);
+          if (!song) {
+            const meta = generatingJobsRef.current.get(jobId);
+            const id = meta?.tempId?.startsWith('job_') ? meta.tempId : songIdForJob(jobId);
+            const placeholder: Song = {
+              id,
+              title: meta?.params.title || 'Generating...',
+              lyrics: '',
+              style: meta?.params.style || meta?.params.songDescription || '',
+              coverUrl: 'https://picsum.photos/200/200?blur=10',
+              duration: '--:--',
+              createdAt: meta?.createdAt || new Date(),
+              isGenerating: true,
+              tags: meta?.params.customMode ? ['custom'] : ['simple'],
+              isPublic: true,
+            };
+            list = [placeholder, ...list.filter(s => s.id !== id)];
+            song = placeholder;
+          }
+          const activeId = song.id;
           const newQueuePos = status.status === 'queued' ? status.queuePosition : undefined;
           const newProgress = normalizedProgress ?? song.progress;
           const newStage = status.stage ?? song.stage;
-          // Skip update if nothing changed to avoid unnecessary re-renders
-          if (newProgress === song.progress && newStage === song.stage && newQueuePos === song.queuePosition) {
-            return prev;
+          if (newProgress === song.progress && newStage === song.stage && newQueuePos === song.queuePosition && song.isGenerating) {
+            return list;
           }
-          return prev.map(s => {
-            if (s.id !== tempId) return s;
-            return { ...s, queuePosition: newQueuePos, progress: newProgress, stage: newStage };
+          return list.map(s => {
+            if (s.id !== activeId) return s;
+            return { ...s, isGenerating: true, queuePosition: newQueuePos, progress: newProgress, stage: newStage };
           });
         });
 
         if (status.status === 'succeeded' && status.result) {
-          cleanupJob(jobId, tempId);
+          cleanupJob(jobId, rowId);
           await refreshSongsList();
 
           if (window.innerWidth < 768) {
             setMobileShowList(true);
           }
         } else if (status.status === 'failed') {
-          cleanupJob(jobId, tempId);
+          cleanupJob(jobId, rowId);
           console.error(`Job ${jobId} failed:`, status.error);
           showToast(`${t('generationFailed')}: ${status.error || 'Unknown error'}`, 'error');
         }
       } catch (pollError) {
-        console.error(`Polling error for job ${jobId}:`, pollError);
-        cleanupJob(jobId, tempId);
+        pollErrors += 1;
+        console.error(`Polling error for job ${jobId} (${pollErrors}/3):`, pollError);
+        if (pollErrors >= 3) {
+          cleanupJob(jobId, tempId);
+          showToast(`${t('generationFailed')}: poll error`, 'error');
+        }
       }
     }, 2000);
 
@@ -1033,7 +1097,15 @@ function AppContent() {
         ditModel: params.ditModel,
       }, token);
 
-      beginPollingJob(job.jobId, tempId);
+      const jobId = job.jobId;
+      const jobSongId = songIdForJob(jobId);
+      generatingJobsRef.current.set(jobId, { tempId: jobSongId, params, createdAt: new Date() });
+
+      // Remap temp_* -> job_<serverId> so resume/poll/delete share one id space
+      setSongs(prev => prev.map(s => (s.id === tempId ? { ...s, id: jobSongId, isGenerating: true } : s)));
+      setSelectedSong(prev => (prev && prev.id === tempId ? { ...prev, id: jobSongId, isGenerating: true } : prev));
+
+      beginPollingJob(jobId, jobSongId);
 
     } catch (e) {
       console.error('Generation error:', e);
@@ -1059,7 +1131,18 @@ function AppContent() {
         const activeStatuses = new Set(['pending', 'queued', 'running']);
         const jobsToResume = jobs.filter((job: any) => activeStatuses.has(job.status));
 
-        if (jobsToResume.length === 0) return;
+        if (jobsToResume.length === 0) {
+          // No active server jobs — clear ghost generating UI and durable map.
+          setSongs(prev => prev.filter(s => !s.isGenerating));
+          generatingJobsRef.current.clear();
+          if (activeJobsRef.current.size > 0) {
+            activeJobsRef.current.forEach(({ pollInterval }) => clearInterval(pollInterval));
+            activeJobsRef.current.clear();
+            setActiveJobCount(0);
+          }
+          setIsGenerating(false);
+          return;
+        }
 
         setSongs(prev => {
           const existingIds = new Set(prev.map(s => s.id));
@@ -1082,10 +1165,18 @@ function AppContent() {
 
             next.unshift(buildTempSongFromParams(params, tempId, job.created_at));
             existingIds.add(tempId);
+            generatingJobsRef.current.set(jobId, {
+              tempId,
+              params: params as GenerationParams,
+              createdAt: job.created_at ? new Date(job.created_at) : new Date(),
+            });
           }
-          return next;
+          // Drop orphan temp_ rows once job_ placeholders exist
+          const cleaned = next.filter(s => !(s.id.startsWith('temp_') && s.isGenerating));
+          return injectGeneratingPlaceholders(cleaned);
         });
 
+        setIsGenerating(true);
         for (const job of jobsToResume) {
           const jobId = job.id || job.jobId;
           if (!jobId) continue;
@@ -1222,13 +1313,20 @@ function AppContent() {
         for (const song of songsToDelete) {
           try {
             // Queued/generating rows are temp client ids (job_<uuid>) — not DB songs yet.
-            if (song.isGenerating || song.id.startsWith('job_')) {
-              const localJobId = song.id.startsWith('job_') ? song.id.slice(4) : song.id;
+            if (song.isGenerating || song.id.startsWith('job_') || song.id.startsWith('temp_')) {
+              let localJobId = song.id.startsWith('job_') ? song.id.slice(4) : '';
               let pollJobId: string | null = null;
               activeJobsRef.current.forEach((data, jid) => {
-                if (data.tempId === song.id) pollJobId = jid;
+                if (data.tempId === song.id || songIdForJob(jid) === song.id) pollJobId = jid;
               });
+              if (!localJobId) {
+                generatingJobsRef.current.forEach((meta, jid) => {
+                  if (meta.tempId === song.id) localJobId = jid;
+                });
+              }
+              if (!localJobId && pollJobId) localJobId = pollJobId;
               try {
+                if (!localJobId) throw new Error('No server job id for placeholder');
                 await generateApi.cancelJob(localJobId, token!);
               } catch (cancelErr) {
                 console.warn('Cancel job failed (still removing from UI):', cancelErr);

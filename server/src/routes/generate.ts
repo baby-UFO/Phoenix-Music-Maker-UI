@@ -305,6 +305,7 @@ router.post('/upload-audio', authMiddleware, (req: AuthenticatedRequest, res: Re
 });
 
 router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  let localJobId: string | null = null;
   try {
     const {
       customMode,
@@ -439,14 +440,14 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
     };
 
     // Create job record in database
-    const localJobId = generateUUID();
+    localJobId = generateUUID();
     await pool.query(
       `INSERT INTO generation_jobs (id, user_id, status, params, created_at, updated_at)
        VALUES (?, ?, 'queued', ?, datetime('now'), datetime('now'))`,
       [localJobId, req.user!.id, JSON.stringify(params)]
     );
 
-    // Start generation
+    // Start generation (if this throws, catch marks the DB row failed — avoids eternal queued)
     const { jobId: hfJobId } = await generateMusicViaAPI(params);
 
     // Update job with Phoenix Engine task ID
@@ -462,7 +463,19 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
     });
   } catch (error) {
     console.error('Generate error:', error);
-    res.status(500).json({ error: (error as Error).message || 'Generation failed' });
+    const message = (error as Error).message || 'Generation failed';
+    if (localJobId) {
+      try {
+        await pool.query(
+          `UPDATE generation_jobs SET status = 'failed', error = ?, updated_at = datetime('now')
+           WHERE id = ? AND status IN ('pending', 'queued', 'running') AND (acestep_task_id IS NULL OR acestep_task_id = '')`,
+          [message, localJobId]
+        );
+      } catch (markErr) {
+        console.error('Failed to mark job failed after start error:', markErr);
+      }
+    }
+    res.status(500).json({ error: message });
   }
 });
 
@@ -490,6 +503,30 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
     // If job is still running, check Phoenix Engine status
     if (job.status === 'cancelled') {
       res.json({ id: job.id, status: 'failed', error: 'Cancelled', created_at: job.created_at });
+      return;
+    }
+
+    // Fail-to-start: queued/running with no engine task id for >15s
+    if (['pending', 'queued', 'running'].includes(job.status) && !job.acestep_task_id) {
+      const createdMs = job.created_at ? new Date(job.created_at).getTime() : 0;
+      const ageMs = createdMs ? Date.now() - createdMs : 0;
+      if (ageMs > 15_000) {
+        const failMsg = 'Failed to start Phoenix Engine task';
+        await pool.query(
+          `UPDATE generation_jobs SET status = 'failed', error = ?, updated_at = datetime('now')
+           WHERE id = ? AND status IN ('pending', 'queued', 'running') AND (acestep_task_id IS NULL OR acestep_task_id = '')`,
+          [failMsg, req.params.jobId]
+        );
+        res.json({ id: job.id, status: 'failed', error: failMsg, created_at: job.created_at });
+        return;
+      }
+      res.json({
+        id: job.id,
+        status: job.status,
+        queuePosition: 1,
+        stage: 'Starting Phoenix Engine...',
+        created_at: job.created_at,
+      });
       return;
     }
 
