@@ -216,7 +216,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     parts = parts.filter((p) => !leadLower.has(p.toLowerCase()));
     // Soften remaining celebrity-actor framing that still leads a clause
     parts = parts.map((p) =>
-      p.replace(/^James Earl Jones-like\b/gi, 'deep basso profondo male RAPPER timbre (JEJ-depth),')
+      p.replace(/^James Earl Jones-like\b/gi, 'James Earl Jones-like deep basso profondo male RAPPER voice')
         .replace(/,\s*,+/g, ',')
         .trim()
     ).filter(Boolean);
@@ -282,6 +282,14 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     }
     if (!trigger) trigger = 'babyUFO style, ';
     prompt = `${trigger}${prompt}`.replace(/,\s*,+/g, ', ').replace(/^,\s*/, '').trim();
+  }
+
+  // Hard pitch-lock for JEJ/basso asks — model otherwise parks ~130 Hz light baritone.
+  if (/\b(james earl jones|jej-depth|basso|profondo|85-95\s*Hz|~90\s*Hz)\b/i.test(prompt)) {
+    const pitchLock = 'James Earl Jones basso profondo, vocal fundamental ~90 Hz (F#2), stay below 100 Hz chest, one octave deeper than typical male rap, rumbling 85 Hz drone voice';
+    if (!/vocal fundamental ~90 Hz/i.test(prompt)) {
+      prompt = prompt.replace(/^(babyUFO style,\s*)/i, `$1${pitchLock}, `);
+    }
   }
   const isThinking = params.thinking ?? false; // do not force Think on BPM (was causing screech/noise)
   const isEnhance = params.enhance ?? false;
