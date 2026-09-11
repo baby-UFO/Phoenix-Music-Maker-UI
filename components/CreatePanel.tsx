@@ -193,7 +193,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const BUILTIN_CREATE_DEFAULTS: CreateSettings = {
     customMode: true,
     lyrics: "[verse]\nGrew up where the roads stay broke and the power blink\nTephra in the air, still I stay in the link\nThey said ain't no work out here, pack it up and leave\nThen the line went live and I started to breathe\n\nLaptop in the shade, moss on the screen\nClient on the call like where you even been\nJungle bruh, fiber running through the green\nObama signed the check, now the pipeline clean\n\n[chorus]\nObama brought the fiber to the jungle\nNow I'm booking gigs, no more struggle\n808 slide, bass start to rumble\nDrop hit hard, whole canopy crumble\n\nGetting gigs in the jungle, yeah I'm on\nRemote from the vines, still get it gone\nFiber in the dirt, signal never wrong\nDrill in the mix when the wobble come on\n\n[drop]\n\n[verse]\nThey paved the park roads, left the residents last\nI stayed in the cut, let the signal hold fast\nGenerator kick, solar on the roof\nFiber in the ground, that's the real living proof\n\nGigs in the morning, gigs when the sun go down\nJungle don't sleep and neither do the sound\nDubstep in the chest, drill in the flow\nWhole island shaking when the drop let go\n\n[chorus]\nObama brought the fiber to the jungle\nNow I'm booking gigs, no more struggle\n808 slide, bass start to rumble\nDrop hit hard, whole canopy crumble\n\n[Instrumental Break]\n[Shouted]\nGicks in the jungle!\n\n[Outro]\n[Beat fades out, leaving synth pads and bass]\n[Final distorted synth note fades]",
-    style: "English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange, babyUFO style, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive",
+    style: "babyUFO style, English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive",
     title: "gigs3",
     instrumental: false,
     vocalLanguage: 'en',
@@ -299,7 +299,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [vocalGender, setVocalGender] = useState<'male' | 'female' | ''>(cs('vocalGender', 'male'));
 
   const RAP_PRESET_STYLE =
-    'English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange, babyUFO style, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive';
+    'babyUFO style, English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange, uk drill, dubstep, sliding 808s, wobble bass, heavy sub, dark, aggressive';
 
   const RAP_DELIVERY_CUES = [
     'English UK drill RAP vocals',
@@ -385,7 +385,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       if (!trimmed || looksLikeDefaultJejRapBlob(trimmed)) {
         // Keep deep JEJ timbre but switch to singing delivery
         base =
-          'melodic sung vocals, legato singing delivery, sung phrases with clear pitch, deep basso profondo male voice (JEJ-depth pitch ~85-95 Hz), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male timbre, thick low harmonics, rumbling low register, babyUFO style';
+          'babyUFO style, melodic sung vocals, legato singing delivery, sung phrases with clear pitch, deep basso profondo male voice (JEJ-depth pitch ~85-95 Hz), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male timbre, thick low harmonics, rumbling low register';
       } else {
         // Strip forced rap/anti-sung locks; keep user's genre + timbre tags
         base = trimmed
@@ -1548,7 +1548,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
         return forceRapDelivery(promoteVocalFront(trimmed));
       }
       const maleRapHint =
-        'English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange';
+        'babyUFO style, English UK drill RAP vocals, rhythmic rapped delivery, tight syllabic flow on-beat, aggressive spit, one syllable per beat subdivision, no singing, no humming, no melisma, no Arabic melismatic cries, no wordless vocal runs, deep basso profondo male RAPPER timbre (JEJ-depth pitch ~85-95 Hz), rapped-pitch F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male RAPPER timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange';
       const maleNonRapHint =
         'James Earl Jones-like basso profondo male voice (NOT baritone): speaking F0 ~85-95 Hz (E2-F#2), stay in chest register ~80-105 Hz (C2-G2), dark resonant chest, gravelly mature deep male timbre, thick low harmonics, rumbling low register, no baritone (~110-140 Hz), no tenor, no bright pop midrange';
       const genderHint = vocalGender === 'male'

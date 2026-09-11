@@ -253,12 +253,36 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
       ? `${userBpm} BPM, 4/4, kick on every beat, snare on 2 and 4, full-time from bar 1, not half-time intro, not half-time, not ${Math.round(userBpm / 2)} BPM`
       : `${userBpm} BPM, 4/4, kick on every beat, snare on 2 and 4, not half-time, not ${Math.round(userBpm / 2)} BPM`;
     if (!new RegExp(`^${userBpm}\\s*BPM\\b`, 'i').test(prompt)) {
-      prompt = `${tempoLock}, ${prompt}`;
+      prompt = `${prompt}, ${tempoLock}`; // keep LoRA trigger at front
     }
   }
 
   // Think + CoT metas lets constrained decoding lock the BPM field the engine already supports
-  const isThinking = userBpm > 0 ? true : (params.thinking ?? false);
+
+  // LoRA / style trigger must lead the caption (tempo/rap rewrites used to bury it).
+  {
+    const triggerRe = /^\s*(babyUFO style|babyUFO)\s*,\s*/i;
+    let trigger = '';
+    const m = prompt.match(triggerRe);
+    if (m) {
+      trigger = 'babyUFO style, ';
+      prompt = prompt.slice(m[0].length);
+    } else {
+      const parts = prompt.split(/,/).map((p) => p.trim()).filter(Boolean);
+      const kept: string[] = [];
+      for (const p of parts) {
+        if (/^babyUFO style$/i.test(p) || /^babyUFO$/i.test(p)) {
+          trigger = 'babyUFO style, ';
+          continue;
+        }
+        kept.push(p);
+      }
+      prompt = kept.join(', ');
+    }
+    if (!trigger) trigger = 'babyUFO style, ';
+    prompt = `${trigger}${prompt}`.replace(/,\s*,+/g, ', ').replace(/^,\s*/, '').trim();
+  }
+  const isThinking = params.thinking ?? false; // do not force Think on BPM (was causing screech/noise)
   const isEnhance = params.enhance ?? false;
 
   const taskType = (params.taskType === 'audio2audio' ? 'cover' : params.taskType) || 'text2music';
@@ -273,7 +297,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     throw new Error(`Source audio file could not be loaded from: ${params.sourceAudioUrl}. Make sure the file was uploaded successfully.`);
   }
 
-  const wantCotMetas = userBpm > 0 ? true : (isEnhance || isThinking) ? (params.useCotMetas ?? true) : false;
+  const wantCotMetas = (isEnhance || isThinking) ? (params.useCotMetas ?? true) : (params.useCotMetas ?? false);
   // Don't rewrite the user's caption when BPM is set — that was scrambling tempo cues
   const wantCotCaption = userBpm > 0 ? false : (isEnhance || isThinking) ? (params.useCotCaption ?? true) : false;
   const wantCotLanguage = (isEnhance || isThinking) ? (params.useCotLanguage ?? true) : false;
