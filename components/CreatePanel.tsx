@@ -211,7 +211,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     audioFormat: 'flac',
     inferenceSteps: 100,
   qualityPreset: 'quality',
-    inferMethod: 'sde',
+    inferMethod: 'ode',
     lmBackend: 'vllm',
     shift: 3.0,
     showLmParams: true,
@@ -473,7 +473,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
   const [enhance, setEnhance] = useState(cs('enhance', true));
   const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>(cs('audioFormat', 'flac'));
   const [inferenceSteps, setInferenceSteps] = useState(cs('inferenceSteps', 100));
-  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(cs('inferMethod', 'sde'));
+  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>(cs('inferMethod', 'ode'));
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>(cs('lmBackend', 'vllm'));
   const [lmModel, setLmModel] = useState(() => {
     return migrateToPhoenixModelId(lsGet(storageKeys.lmModel.primary, storageKeys.lmModel.legacy) || DEFAULT_PHOENIX_LM_MODEL);
@@ -601,21 +601,21 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
     if (preset === 'fast') {
       persistModel(bestFast);
       setInferenceSteps(50);
-      setInferMethod('sde');
+      setInferMethod('ode');
       setShift(1.0);
-      setUseAdg(true);
+      setUseAdg(false);
     } else if (preset === 'quality') {
       persistModel(bestQuality);
       setInferenceSteps(100);
-      setInferMethod('sde');
+      setInferMethod('ode');
       setShift(1.0);
-      setUseAdg(true);
+      setUseAdg(false);
     } else {
       persistModel(bestMax);
       setInferenceSteps(200);
-      setInferMethod('sde');
+      setInferMethod('ode');
       setShift(1.0);
-      setUseAdg(true);
+      setUseAdg(false);
     }
     setLmModel(bestLm);
     lsSet(storageKeys.lmModel.primary, bestLm, storageKeys.lmModel.legacy);
@@ -657,7 +657,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
       const phoenixNext = toPhoenixModelId(next);
       setSelectedModel(phoenixNext);
       lsSet(storageKeys.model.primary, phoenixNext, storageKeys.model.legacy);
-      setUseAdg(true);
+      setUseAdg(false);
       console.log(`[CreatePanel] inferenceSteps=${steps} on turbo '${currentModel}' -> auto-switch to '${next}'`);
     }
     return next;
@@ -1832,7 +1832,7 @@ const CREATE_SETTINGS_LEGACY = storageKeys.createSettings.legacy;
                           // Auto-adjust parameters for non-turbo models
                           if (!isTurboModel(model.id)) {
                             if (inferenceSteps <= TURBO_INFER_STEPS_MAX) setInferenceSteps(20);
-                            setUseAdg(true);
+                            setUseAdg(false);
                           } else if (inferenceSteps > TURBO_INFER_STEPS_MAX) {
                             // Turbo engine clamps >8 -> 8; keep UI honest
                             setInferenceSteps(TURBO_INFER_STEPS_MAX);

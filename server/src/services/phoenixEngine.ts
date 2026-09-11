@@ -374,15 +374,15 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     params.repaintingStart ?? 0.0,                                // 15: Repainting Start
     params.repaintingEnd ?? -1,                                   // 16: Repainting End
     params.instruction || 'Fill the audio semantic mask with the style described in the text prompt.', // 17: Instruction
-    params.audioCoverStrength ?? 1.0,                             // 18: Audio Cover / LM Codes Strength
-    params.coverNoiseStrength ?? 0.0,                             // 19: Cover Noise Strength
+    params.lmCodesStrength ?? 1.0,                                // 18: LM Codes Strength (Gradio)
+    params.audioCoverStrength ?? 1.0,                             // 19: Cover Strength (Gradio)
     taskType,                                                     // 20: task_type
     params.useAdg ?? false,                                       // 21: Use ADG
     params.cfgIntervalStart ?? 0.0,                               // 22: CFG Interval Start
     params.cfgIntervalEnd ?? 1.0,                                 // 23: CFG Interval End
     (params.shift != null
       ? params.shift
-      : (params.ditModel && /turbo/i.test(params.ditModel) ? 3.0 : 1.0)), // 24: Shift (base/sft default 1.0)
+      : (params.ditModel && /turbo/i.test(params.ditModel) ? 3.0 : 3.0)), // 24: Shift (match early working gigs default 3.0)
     params.inferMethod || 'ode',                                  // 25: Inference Method
     params.customTimesteps || '',                                 // 26: Custom Timesteps
     params.audioFormat || 'mp3',                                  // 27: Audio Format
@@ -395,20 +395,24 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     wantCotMetas,                                                 // 34: CoT Metas
     wantCotCaption,                                               // 35: CaptionRewrite
     wantCotLanguage,                                              // 36: CoT Language
-    // API omits State (is_format_caption_state); do not insert it in predict() args
-    params.constrainedDecodingDebug ?? false,                     // 37: Constrained Decoding Debug (API)
-    params.allowLmBatch ?? true,                                  // 38: ParallelThinking
-    params.getScores ?? false,                                    // 39: Auto Score
-    params.getLrc ?? false,                                       // 40: Auto LRC
-    params.scoreScale ?? 0.5,                                     // 41: Quality Score Sensitivity
-    params.lmBatchChunkSize ?? 8,                                 // 42: LM Batch Chunk Size
-    params.trackName || null,                                     // 43: Track Name
-    params.completeTrackClasses || [],                            // 44: Track Names
-    true,                                                         // 45: Enable Normalization
-    -1.0,                                                         // 46: Target Peak (dB)
-    0.0,                                                          // 47: Latent Shift
-    1.0,                                                          // 48: Latent Rescale
-    params.autogen ?? false,                                      // 49: AutoGen
+    null,                                                         // 37: Gradio State (required placeholder)
+    params.constrainedDecodingDebug ?? false,                     // 38: Constrained Decoding Debug
+    params.allowLmBatch ?? true,                                  // 39: ParallelThinking
+    params.getScores ?? false,                                    // 40: Auto Score
+    params.getLrc ?? false,                                       // 41: Auto LRC
+    params.scoreScale ?? 0.5,                                     // 42: Quality Score Sensitivity
+    params.lmBatchChunkSize ?? 8,                                 // 43: LM Batch Chunk Size
+    params.trackName || null,                                     // 44: Track Name
+    params.completeTrackClasses || [],                            // 45: Track Names
+    true,                                                         // 46: Enable Normalization
+    -1.0,                                                         // 47: Target Peak (dB)
+    0.0,                                                          // 48: Latent Shift
+    1.0,                                                          // 49: Latent Rescale
+    params.autogen ?? false,                                      // 50: AutoGen
+    null,                                                         // 51: Gradio State
+    null,                                                         // 52: Gradio State
+    null,                                                         // 53: Gradio State
+    null,                                                         // 54: Gradio State
   ];
 }
 
