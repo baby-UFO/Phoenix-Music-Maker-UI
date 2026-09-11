@@ -631,10 +631,11 @@ function gradioPredictTimeoutMs(params: GenerationParams): number {
   const duration = Number(params.duration) || 120;
   const steps = Number(params.inferenceSteps) || 8;
   const turbo = !!(params.ditModel && /turbo/i.test(params.ditModel));
-  // Turbo Create wall-clock is ~8Ã¢â‚¬â€œ15s (outer ~20Ã¢â‚¬â€œ30s). Do NOT babysit hung turbo for minutes.
+  // Turbo: real UI Create ~3–4min (gigs3-5 ~207s). Align with STALL_MS 360s.
   // Quality / non-turbo keeps the longer budget.
   if (turbo) {
-    return Math.min(30_000, Math.max(20_000, 20_000 + Math.max(0, duration - 30) * 50));
+    // Match real Turbo walls (~207s gigs3-5) + STALL_MS 360s — 20–30s false-fails working path
+    return Math.min(600_000, Math.max(360_000, 360_000 + Math.max(0, duration - 120) * 1000 + steps * 2000));
   }
   const base = 180_000;
   return Math.min(1_200_000, Math.max(base, base + duration * 2000 + steps * 5000));
