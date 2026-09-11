@@ -1684,36 +1684,79 @@ export function cancelEngineJob(jobId: string): boolean {
 
 
 
-/** On server boot/recycle: DB queued|running with phoenix_task_id but not in activeJobs → fail (no eternal ghosts). */
+/** True if any ESTABLISHED TCP to Phoenix Engine :8001 (Gradio still mid-job after Node bounce). */
+function hasEstablishedGradioSockets(): boolean {
+  try {
+    const out = execSync('netstat -ano', { encoding: 'utf8', timeout: 5000, windowsHide: true });
+    return out.split(/\r?\n/).some((line) => /:8001\b/.test(line) && /ESTABLISHED/i.test(line));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * On server boot/recycle: clear eternal ghosts, but do NOT false-fail live Creates.
+ * - queued/pending age <120s: skip
+ * - running age <30s (turbo stall window): skip
+ * - any orphan while ESTABLISHED→:8001: skip (Gradio still has the task)
+ * - do NOT use a 360s babysit window
+ * - older orphans with no ESTAB: fail `Server recycled — job lost`
+ */
 export async function reconcileOrphanGenerationJobs(): Promise<number> {
   try {
     const result = await pool.query(
-      `SELECT id, phoenix_task_id, status FROM generation_jobs
+      `SELECT id, phoenix_task_id, status, created_at FROM generation_jobs
        WHERE status IN ('pending', 'queued', 'running')`,
     );
+    const estab = hasEstablishedGradioSockets();
+    if (estab) {
+      console.log('[Boot] ESTABLISHED→:8001 present — skipping orphan reclaim this pass');
+      return 0;
+    }
+
     let marked = 0;
-    for (const row of result.rows as Array<{ id: string; phoenix_task_id?: string | null; status: string }>) {
+    const now = Date.now();
+    for (const row of result.rows as Array<{
+      id: string;
+      phoenix_task_id?: string | null;
+      status: string;
+      created_at?: string | null;
+    }>) {
       const engineId = row.phoenix_task_id;
       if (engineId && activeJobs.has(engineId)) {
-        // Still live in this process — ensure queue is draining
         if (!isProcessingQueue && jobQueue.length > 0) {
           void processQueue();
         }
         continue;
       }
-      // No in-memory job after bounce (or never started predict)
+
+      const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+      const ageMs = createdMs ? now - createdMs : Number.POSITIVE_INFINITY;
+
+      // Fresh queued — worker may still be about to start predict
+      if ((row.status === 'queued' || row.status === 'pending') && ageMs < 120_000) {
+        console.log(`[Boot] skip young queued orphan ${row.id} age=${Math.round(ageMs / 1000)}s`);
+        continue;
+      }
+
+      // Fresh running, no ESTAB (checked above): skip if age <120s — not a 360s babysit
+      if (row.status === 'running' && ageMs < 120_000) {
+        console.log(`[Boot] skip young running orphan ${row.id} age=${Math.round(ageMs / 1000)}s`);
+        continue;
+      }
+
       await pool.query(
         `UPDATE generation_jobs SET status = 'failed', error = ?, updated_at = datetime('now')
          WHERE id = ? AND status IN ('pending', 'queued', 'running')`,
         ['Server recycled — job lost', row.id],
       );
       marked += 1;
-      console.warn(`[Boot] orphan generation_job ${row.id} (engine=${engineId || 'none'}) → failed`);
+      console.warn(`[Boot] orphan generation_job ${row.id} (engine=${engineId || 'none'}, status=${row.status}, age=${Math.round(ageMs / 1000)}s) → failed`);
     }
     if (marked > 0) {
       console.log(`[Boot] marked ${marked} orphan generation_jobs as failed (Server recycled — job lost)`);
     } else {
-      console.log('[Boot] no orphan generation_jobs');
+      console.log('[Boot] no orphan generation_jobs reclaimed');
     }
     return marked;
   } catch (e) {
