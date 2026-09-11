@@ -447,19 +447,37 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       [localJobId, req.user!.id, JSON.stringify(params)]
     );
 
-    // Start generation (if this throws, catch marks the DB row failed — avoids eternal queued)
-    const { jobId: hfJobId } = await generateMusicViaAPI(params);
-
-    // Store engine task id but keep DB queued until status poll sees engine running
-    await pool.query(
-      `UPDATE generation_jobs SET phoenix_task_id = ?, status = 'queued', updated_at = datetime('now') WHERE id = ?`,
-      [hfJobId, localJobId]
-    );
-
+    // CRITICAL: return jobId BEFORE any Gradio/Client work so Create never hangs on ESTAB/HOL
     res.json({
       jobId: localJobId,
       status: 'queued',
       queuePosition: 1,
+    });
+
+    const bgJobId = localJobId;
+    const bgParams = params;
+    setImmediate(() => {
+      void (async () => {
+        try {
+          const { jobId: hfJobId } = await generateMusicViaAPI(bgParams);
+          await pool.query(
+            `UPDATE generation_jobs SET phoenix_task_id = ?, status = 'queued', updated_at = datetime('now') WHERE id = ?`,
+            [hfJobId, bgJobId],
+          );
+        } catch (error) {
+          console.error('Generate background start error:', error);
+          const message = (error as Error).message || 'Generation failed';
+          try {
+            await pool.query(
+              `UPDATE generation_jobs SET status = 'failed', error = ?, updated_at = datetime('now')
+               WHERE id = ? AND status IN ('pending', 'queued', 'running')`,
+              [message, bgJobId],
+            );
+          } catch (markErr) {
+            console.error('Failed to mark job failed after background start error:', markErr);
+          }
+        }
+      })();
     });
   } catch (error) {
     console.error('Generate error:', error);
@@ -475,7 +493,9 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
         console.error('Failed to mark job failed after start error:', markErr);
       }
     }
-    res.status(500).json({ error: message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
+    }
   }
 });
 
